@@ -3,12 +3,13 @@ Artefato 2 — Serviço web (FastAPI) que serve o MODELO REAL (item 7)
 ====================================================================
 
 POST /predict        -> 1 cliente: probabilidade + SHAP por instancia + explicacao
-POST /predict_batch  -> CSV (lote): linhas scored COM SHAP/explicacao por linha + resumo
-GET  /model_card     -> metricas reais + bloco de overfit (item 3) + importancia (item 5)
+POST /predict_batch  -> CSV (lote): linhas scored COM SHAP/explicacao + resumo
+GET  /model_card     -> metricas reais + overfit (item 3) + importancia (item 5)
 GET  /health         -> status
 
-Deploy "caso 2": ferramenta interna, servidor simples. Modelo carregado UMA vez no
-startup. CORS restrito por env. Rodar (Render): uvicorn app:app --host 0.0.0.0 --port $PORT
+Hardening (security review): rate-limit por IP, cap de linhas no lote, parse so das
+colunas necessarias, /health enxuto, exception handler sem traceback, CORS por lista.
+Rodar (Render): uvicorn app:app --host 0.0.0.0 --port $PORT
 """
 
 from __future__ import annotations
@@ -25,16 +26,24 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 import explain as explain_mod
 import inference as inf
 
 log = logging.getLogger("vitaliza-api")
 ROOT = Path(__file__).resolve().parent
-MAX_CSV_BYTES = 5_000_000
+MAX_CSV_BYTES = 2_000_000      # 2MB
+MAX_ROWS = 2000                # cap antes do SHAP (evita OOM/DoS no free tier)
 
-app = FastAPI(title="Vitaliza Churn API", version="1.1",
+app = FastAPI(title="Vitaliza Churn API", version="1.2",
               description="Serve o XGBoost serializado (NAO LLM) + SHAP por instancia.")
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Origens liberadas por padrao (Pages do grupo + dev local). Pode sobrescrever via
 # FRONTEND_ORIGIN (lista separada por virgula) — mas ja funciona sem setar nada.
@@ -45,6 +54,7 @@ app.add_middleware(CORSMiddleware, allow_origins=_origins,
 
 MODEL, EXPLAINER, META = inf.load_artifacts()
 FEATURE_ORDER = META["feature_order"]
+_USECOLS = set(FEATURE_ORDER) | {"Churn"}
 
 
 class CustomerFeatures(BaseModel):
@@ -72,8 +82,7 @@ async def _unhandled(request: Request, exc: Exception):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": "champion_xgboost.pkl", "features": len(FEATURE_ORDER),
-            "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY")), "origins": _origins}
+    return {"status": "ok"}
 
 
 @app.get("/model_card")
@@ -98,7 +107,8 @@ def model_card():
 
 
 @app.post("/predict")
-def predict(payload: CustomerFeatures):
+@limiter.limit("60/minute")
+def predict(request: Request, payload: CustomerFeatures):
     """Validacao Pydantic -> 422 automatico em tipo/faixa invalidos."""
     try:
         result = inf.shap_one(MODEL, EXPLAINER, META, payload.model_dump())
@@ -109,17 +119,24 @@ def predict(payload: CustomerFeatures):
 
 
 @app.post("/predict_batch")
-async def predict_batch(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def predict_batch(request: Request, file: UploadFile = File(...)):
     raw = await file.read()
     if len(raw) > MAX_CSV_BYTES:
         raise HTTPException(status_code=413, detail=f"CSV maior que {MAX_CSV_BYTES} bytes.")
     try:
+        # parse so as colunas uteis + 1 linha alem do cap p/ detectar overflow
+        def _read(enc=None):
+            return pd.read_csv(io.BytesIO(raw), encoding=enc,
+                               usecols=lambda c: c in _USECOLS, nrows=MAX_ROWS + 1)
         try:
-            df = pd.read_csv(io.BytesIO(raw))
+            df = _read()
         except UnicodeDecodeError:
-            df = pd.read_csv(io.BytesIO(raw), encoding="latin-1")
+            df = _read("latin-1")
         if df.empty:
             raise HTTPException(status_code=422, detail="CSV sem linhas de dados.")
+        if len(df) > MAX_ROWS:
+            raise HTTPException(status_code=413, detail=f"CSV com mais de {MAX_ROWS} linhas.")
         scored = inf.predict_batch(MODEL, EXPLAINER, META, df)
     except HTTPException:
         raise
