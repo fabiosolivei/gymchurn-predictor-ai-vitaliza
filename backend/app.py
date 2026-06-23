@@ -103,7 +103,8 @@ def model_card():
     leak_path = ROOT / "models" / "leakage_audit.json"
     leakage = json.loads(leak_path.read_text(encoding="utf-8")) if leak_path.exists() else None
     return {"meta": META, "metrics": metrics, "overfit": overfit,
-            "feature_importance": imp, "leakage_audit": leakage}
+            "feature_importance": imp, "leakage_audit": leakage,
+            "llm_enabled": bool(os.environ.get("OPENROUTER_API_KEY"))}
 
 
 @app.post("/predict")
@@ -145,10 +146,24 @@ async def predict_batch(request: Request, file: UploadFile = File(...)):
     except pd.errors.ParserError as e:
         raise HTTPException(status_code=422, detail=f"CSV invalido: {e}")
 
+    from collections import Counter
     counts = scored["pred_risk_bucket"].value_counts().to_dict()
     n = int(len(scored))
     em_risco = int((scored["pred_churn_probability"] >= inf.THRESHOLD).sum())
     resumo = (f"{n} clientes avaliados; {em_risco} em risco (prob >= {inf.THRESHOLD}). "
               "Distribuicao: " + ", ".join(f"{k}: {v}" for k, v in counts.items()) + ".")
+    # Caso A: recomendacao AGREGADA via LLM a partir do perfil de risco do lote
+    drv = Counter()
+    em_risco_rows = scored[scored["pred_churn_probability"] >= inf.THRESHOLD]   # so os em risco
+    for s in em_risco_rows["pred_top_drivers"]:
+        for part in str(s).split(";"):
+            part = part.strip()
+            if part.endswith("(+)"):
+                drv[part[:-3].strip()] += 1
+    profile = {"n": n, "em_risco": em_risco, "distribuicao": counts,
+               "pct_risco": (100.0 * em_risco / n) if n else 0.0,
+               "top_drivers": drv.most_common(5)}
+    agg = explain_mod.explain_batch_aggregate(profile)
     return {"n": n, "em_risco": em_risco, "distribuicao": counts, "resumo": resumo,
+            "recomendacao_agregada": agg["recomendacao_agregada"], "fonte": agg["fonte"],
             "rows": json.loads(scored.to_json(orient="records"))}

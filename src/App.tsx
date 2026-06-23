@@ -7,6 +7,7 @@ import { SimulatorForm } from './components/SimulatorForm';
 import { PredictionDisplay } from './components/PredictionDisplay';
 import { EDAView } from './components/EDAView';
 import { ModelSpecsView } from './components/ModelSpecsView';
+import { BulkUploadForm } from './components/BulkUploadForm';
 import { 
   Building2, 
   LayoutDashboard, 
@@ -17,12 +18,13 @@ import {
   ChevronRight,
   ShieldCheck,
   Search,
-  Settings
+  Settings,
+  Layers
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
-export type Tab = 'dashboard' | 'eda' | 'simulator' | 'model';
+export type Tab = 'dashboard' | 'eda' | 'simulator' | 'batch' | 'model';
 
 export interface GlobalFilters {
   gender: 'All' | 'Male' | 'Female';
@@ -80,6 +82,7 @@ export default function App() {
             { id: 'dashboard', label: 'Dashboard Executivo', icon: LayoutDashboard },
             { id: 'eda', label: 'Análise Avançada EDA', icon: LineChart },
             { id: 'simulator', label: 'Simulador Preditivo', icon: BrainCircuit },
+            { id: 'batch', label: 'Análise em Lote', icon: Layers },
             { id: 'model', label: 'Fronteira & Governança da IA', icon: ShieldCheck },
           ].map((item) => (
             <button
@@ -261,6 +264,22 @@ export default function App() {
                     </div>
                   )}
                 </div>
+              </motion.section>
+            )}
+
+            {activeTab === 'batch' && (
+              <motion.section
+                key="batch"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-8"
+              >
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">Análise em Lote</h2>
+                  <p className="text-slate-500 font-medium">Caso A — dump de dados → score + recomendação estratégica da base</p>
+                </div>
+                <BulkUploadForm />
               </motion.section>
             )}
 

@@ -57,6 +57,12 @@ export const PredictionDisplay = ({ result }: PredictionDisplayProps) => {
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
         <h4 className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
           <ArrowRightCircle size={14} className="text-indigo-600" /> Ações Recomendadas
+          {result.fonte && (
+            <span className={cn("ml-auto text-[9px] font-black px-2 py-0.5 rounded-full normal-case tracking-normal",
+              result.fonte.startsWith('llm') ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600')}>
+              {result.fonte.startsWith('llm') ? 'IA / LLM' : 'regras (fallback)'}
+            </span>
+          )}
         </h4>
         <div className="grid grid-cols-1 gap-3">
           {result.recommendations.map((rec, i) => (

@@ -1,16 +1,17 @@
 """
-Artefato 2 — Camada de explicação (item 6)
-============================================
+Artefato 2 — Camada de explicação + recomendação (item 6, via LLM)
+===================================================================
 
-explain_rule_based()  -> CAMINHO PRIMÁRIO: explicação + prescrição PT-BR determinística
-                         a partir do SHAP REAL do cliente. Sem chave/serviço externo.
-explain_llm()          -> UPGRADE opcional (OpenRouter/DeepSeek). Pede JSON
-                         {diagnostico, prescricao} e SEMPRE preenche os dois campos;
-                         qualquer falha/ausencia de chave -> cai no rule-based.
-explain()              -> fachada: LLM se houver chave, senao rule-based.
+O professor exige (Encontros 17/20): a partir do SHAP, o LLM devolve uma
+EXPLICAÇÃO em linguagem natural E uma RECOMENDAÇÃO/prescrição de ação — nos dois
+modos (individual / lote). O rule-based fica só como FALLBACK quando a chave
+OpenRouter não está setada (ou a chamada falha), pra nada quebrar.
 
-A predicao em si e SEMPRE o modelo real (XGBoost serializado); esta camada so
-traduz o SHAP em linguagem de negocio.
+explain(result)                 -> {explicacao, recomendacao, fonte}  (1 cliente, Caso B)
+explain_batch_aggregate(profile)-> {recomendacao_agregada, fonte}     (lote/dump, Caso A)
+
+A chamada LLM usa o SDK OpenAI apontado pro OpenRouter -> o OpenLIT instrumenta
+tokens/custo/latência automaticamente (observabilidade).
 """
 
 from __future__ import annotations
@@ -19,6 +20,10 @@ import json
 import os
 from typing import Any
 
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+LLM_MODEL = os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+
+# ---- bancos rule-based (fallback determinístico) --------------------------
 _DRIVER_CHURN = {
     "Lifetime": "pouco tempo de casa (ainda nao formou habito)",
     "Contract_period": "contrato curto (baixo compromisso)",
@@ -66,8 +71,31 @@ _ACTION = {
 }
 
 
+# ---- LLM (OpenRouter via SDK OpenAI; OpenLIT instrumenta) ------------------
+def _llm_json(system: str, user: str, max_tokens: int = 400) -> dict | None:
+    """Chama o OpenRouter pedindo JSON. None se sem chave / erro."""
+    key = os.environ.get("OPENROUTER_API_KEY")
+    if not key:
+        return None
+    try:
+        from openai import OpenAI
+        client = OpenAI(base_url=OPENROUTER_BASE, api_key=key)
+        resp = client.chat.completions.create(
+            model=LLM_MODEL, max_tokens=max_tokens, temperature=0.3,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+        )
+        txt = (resp.choices[0].message.content or "").strip()
+        if txt.startswith("```"):
+            txt = txt.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
+        obj = json.loads(txt)
+        return obj if isinstance(obj, dict) else None   # nao-dict -> fallback (evita 500)
+    except Exception:
+        return None
+
+
+# ---- individual (Caso B) --------------------------------------------------
 def explain_rule_based(result: dict) -> dict[str, Any]:
-    """result = saida de inference.shap_one (ou {churn_probability, risk, top})."""
     proba = result["churn_probability"]
     risk = result["risk"]
     top = result.get("top", [])
@@ -75,16 +103,12 @@ def explain_rule_based(result: dict) -> dict[str, Any]:
     keep_drivers = [c for c in top if c["shap"] < 0][:2]
     causas = [_DRIVER_CHURN.get(c["feature"], c["feature"]) for c in churn_drivers]
     apoios = [_DRIVER_KEEP.get(c["feature"], c["feature"]) for c in keep_drivers]
-
     pct = f"{proba * 100:.0f}%"
-    if causas:
-        explic = (f"Risco de churn {risk.lower()} ({pct}). Principais fatores de evasao: "
-                  + "; ".join(causas) + ".")
-    else:
-        explic = f"Risco de churn {risk.lower()} ({pct}). Sem fator dominante de evasao."
+    explic = (f"Risco de churn {risk.lower()} ({pct}). Principais fatores de evasao: "
+              + "; ".join(causas) + "." if causas
+              else f"Risco de churn {risk.lower()} ({pct}). Sem fator dominante de evasao.")
     if apoios:
         explic += " Fatores que ajudam a reter: " + "; ".join(apoios) + "."
-
     acoes = []
     for c in churn_drivers:
         a = _ACTION.get(c["feature"])
@@ -92,48 +116,29 @@ def explain_rule_based(result: dict) -> dict[str, Any]:
             acoes.append(a)
     if not acoes:
         acoes = ["manter acompanhamento padrao de retencao"]
-    prescric = "Acoes sugeridas: " + "; ".join(acoes) + "."
-    return {"explicacao": explic, "prescricao": prescric, "fonte": "rule-based"}
+    return {"explicacao": explic, "recomendacao": "Acoes sugeridas: " + "; ".join(acoes) + ".",
+            "fonte": "rule-based"}
 
 
-def explain_llm(result: dict, model: str = "deepseek/deepseek-chat", timeout: float = 8.0) -> dict[str, Any]:
-    """Upgrade via OpenRouter. Sem chave/erro/JSON invalido -> cai no rule-based,
-    garantindo que explicacao E prescricao nunca voltem vazias."""
-    key = os.environ.get("OPENROUTER_API_KEY")
-    base = explain_rule_based(result)            # fallback deterministico
-    if not key:
+def explain_llm(result: dict) -> dict[str, Any]:
+    base = explain_rule_based(result)
+    fatores = "\n".join(
+        f"- {c['feature']}: shap={c['shap']:+.3f} ({'aumenta' if c['shap'] > 0 else 'reduz'} risco)"
+        for c in result.get("top", []))
+    data = _llm_json(
+        "Voce e analista de retencao de uma academia. Seja conciso e pratico.",
+        ("Probabilidade de churn deste aluno: "
+         f"{result['churn_probability']*100:.0f}% ({result['risk']}). Fatores SHAP:\n{fatores}\n\n"
+         'Responda ESTRITAMENTE em JSON: {"explicacao": "2-3 frases sobre POR QUE o risco e esse", '
+         '"recomendacao": "1-2 acoes concretas de retencao para este aluno"}. '
+         "Em portugues, sem inventar dados alem dos fatores."))
+    if not data:
         return base
-    try:
-        import httpx
-        fatores = "\n".join(
-            f"- {c['feature']}: shap={c['shap']:+.3f} ({'aumenta' if c['shap'] > 0 else 'reduz'} risco)"
-            for c in result.get("top", [])
-        )
-        prompt = (
-            "Voce e analista de retencao de uma academia. Probabilidade de churn "
-            f"{result['churn_probability']*100:.0f}% ({result['risk']}). Fatores SHAP:\n{fatores}\n\n"
-            'Responda ESTRITAMENTE em JSON: {"diagnostico": "2-3 frases", "prescricao": "1-2 acoes concretas"}. '
-            "Em portugues, sem inventar dados alem dos fatores."
-        )
-        resp = httpx.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={"model": model, "max_tokens": 350,
-                  "messages": [{"role": "user", "content": prompt}]},
-            timeout=timeout,
-        )
-        resp.raise_for_status()
-        txt = resp.json()["choices"][0]["message"]["content"].strip()
-        if txt.startswith("```"):
-            txt = txt.strip("`").split("\n", 1)[-1]
-        data = json.loads(txt)
-        diag = str(data.get("diagnostico", "")).strip()
-        presc = str(data.get("prescricao", "")).strip()
-        if not diag or not presc:           # JSON incompleto -> nao degrada o contrato
-            return base
-        return {"explicacao": diag, "prescricao": presc, "fonte": f"llm:{model}"}
-    except Exception:
-        return base                          # rede/timeout/401/JSON invalido
+    explic = str(data.get("explicacao", "")).strip()
+    rec = str(data.get("recomendacao", "")).strip()
+    if not explic or not rec:
+        return base
+    return {"explicacao": explic, "recomendacao": rec, "fonte": f"llm:{LLM_MODEL}"}
 
 
 def explain(result: dict, use_llm: bool = True) -> dict[str, Any]:
@@ -142,10 +147,52 @@ def explain(result: dict, use_llm: bool = True) -> dict[str, Any]:
     return explain_rule_based(result)
 
 
+# ---- lote / dump (Caso A): recomendacao AGREGADA --------------------------
+def _aggregate_rule_based(profile: dict) -> str:
+    drivers = profile.get("top_drivers", [])[:3]
+    nomes = [_DRIVER_CHURN.get(f, f) for f, _ in drivers]
+    acoes = []
+    for f, _ in drivers:
+        a = _ACTION.get(f)
+        if a and a not in acoes:
+            acoes.append(a)
+    base = (f"{profile['em_risco']} de {profile['n']} clientes em risco "
+            f"({profile['pct_risco']:.0f}%).")
+    if nomes:
+        base += " Principais motores de evasao na base: " + "; ".join(nomes) + "."
+    if acoes:
+        base += " Ações prioritárias: " + "; ".join(acoes) + "."
+    return base
+
+
+def explain_batch_aggregate(profile: dict) -> dict[str, Any]:
+    """profile = {n, em_risco, pct_risco, distribuicao, top_drivers:[(feat,count)]}."""
+    fallback = {"recomendacao_agregada": _aggregate_rule_based(profile), "fonte": "rule-based"}
+    if not profile.get("top_drivers"):           # sem fator dominante -> nao arrisca alucinacao do LLM
+        return fallback
+    drivers = ", ".join(f"{f} ({c}x)" for f, c in profile.get("top_drivers", [])[:5])
+    data = _llm_json(
+        "Voce e analista de retencao de uma academia. Recomendacoes acionaveis para a GESTAO.",
+        (f"Lote de {profile['n']} clientes; {profile['em_risco']} em risco "
+         f"({profile['pct_risco']:.0f}%). Distribuicao de risco: {profile.get('distribuicao')}. "
+         f"Fatores SHAP mais frequentes entre os em risco: {drivers}.\n\n"
+         'Responda ESTRITAMENTE em JSON: {"recomendacao_agregada": "3-4 acoes estrategicas '
+         'priorizadas para reduzir o churn DESTA base"}. Em portugues, baseado so nos fatores.'),
+        max_tokens=450)
+    if not data:
+        return fallback
+    rec = data.get("recomendacao_agregada", "")
+    if isinstance(rec, list):                       # o LLM as vezes devolve uma lista
+        rec = " ".join(f"{i}) {str(x).strip()}." for i, x in enumerate(rec, 1) if str(x).strip())
+    rec = str(rec).strip()
+    return {"recomendacao_agregada": rec, "fonte": f"llm:{LLM_MODEL}"} if rec else fallback
+
+
 if __name__ == "__main__":
     demo = {"churn_probability": 0.82, "risk": "Alto risco", "top": [
-        {"feature": "Month_to_end_contract", "shap": 0.31, "direction": "churn"},
-        {"feature": "Lifetime", "shap": -0.20, "direction": "retencao"},
-        {"feature": "Contract_period", "shap": 0.18, "direction": "churn"},
-    ]}
-    print(explain_rule_based(demo))
+        {"feature": "Month_to_end_contract", "shap": 0.31}, {"feature": "Lifetime", "shap": -0.2},
+        {"feature": "Contract_period", "shap": 0.18}]}
+    print("individual:", explain_rule_based(demo))
+    print("lote:", explain_batch_aggregate(
+        {"n": 100, "em_risco": 27, "pct_risco": 27.0, "distribuicao": {"Alto risco": 27},
+         "top_drivers": [("Contract_period", 18), ("Lifetime", 12)]}))

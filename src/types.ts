@@ -20,6 +20,7 @@ export interface PredictionResult {
   interpretation: string;
   recommendations: string[];
   featureImportance: { feature: string; impact: number }[];
+  fonte?: string;
 }
 
 export interface KPIData {

@@ -28,7 +28,7 @@ App web que **serve um classificador XGBoost real** de churn de academia, com **
 | 3 | Sem sobreajuste (CV) | bloco `overfit` em `/model_card` (CV 0.982 ~ teste 0.983) |
 | 4 | SHAP por instância | `backend/shap_explainer.pkl` + `POST /predict` (`shap[]`) |
 | 5 | Feature importance | `feature_importance` em `/model_card` |
-| 6 | Explicação em linguagem natural | `backend/explain.py` (rule-based + OpenRouter opcional) |
+| 6 | Explicação **+ recomendação** em linguagem natural (LLM) | `backend/explain.py` via **OpenRouter/DeepSeek** (SDK OpenAI), individual + lote. Requer `OPENROUTER_API_KEY`; rule-based é só fallback anti-crash. `/model_card` expõe `llm_enabled` |
 | 7 | Serviço web lote+individual, treino÷inferência, joblib | `backend/train.py` ÷ `backend/inference.py` + `app.py` |
 
 ## Rodar localmente

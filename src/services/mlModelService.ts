@@ -68,7 +68,7 @@ interface BackendPredict {
   base_value: number;
   top: { feature: string; value: number; shap: number; direction: string }[];
   explicacao: string;
-  prescricao: string;
+  recomendacao: string;
   fonte: string;
 }
 
@@ -87,9 +87,9 @@ export async function predictChurn(data: CustomerData): Promise<PredictionResult
   const maxAbs = Math.max(...top.map((c) => Math.abs(c.shap)), 1e-9);
 
   // Rule-based vem como "Acoes sugeridas: a; b; c"; LLM vem como texto livre (sem ';').
-  const cleaned = r.prescricao.replace(/^A[cç][õo]es sugeridas:\s*/i, "").replace(/\.$/, "");
+  const cleaned = (r.recomendacao || "").replace(/^A[cç][õo]es sugeridas:\s*/i, "").replace(/\.$/, "");
   const parts = r.fonte?.startsWith("llm")
-    ? cleaned.split(/(?<=[.!?])\s+/)
+    ? cleaned.split(/\n+|\s*\d+\)\s*/)
     : cleaned.split(";");
   const recommendations = parts.map((s) => s.trim()).filter(Boolean);
 
@@ -97,11 +97,12 @@ export async function predictChurn(data: CustomerData): Promise<PredictionResult
     churnProbability: r.churn_probability,
     riskCategory: mapRisk(r.risk),
     interpretation: r.explicacao,
-    recommendations: recommendations.length ? recommendations : [r.prescricao],
+    recommendations: recommendations.length ? recommendations : [r.recomendacao],
     featureImportance: top.map((c) => ({
       feature: FRIENDLY[c.feature] || c.feature,
       impact: c.shap / maxAbs,
     })),
+    fonte: r.fonte,
   };
 }
 

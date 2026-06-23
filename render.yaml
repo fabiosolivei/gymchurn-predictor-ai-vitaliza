@@ -14,4 +14,4 @@ services:
       - key: FRONTEND_ORIGIN
         sync: false          # ex: https://fabiosolivei.github.io
       - key: OPENROUTER_API_KEY
-        sync: false          # opcional (upgrade do item 6)
+        sync: false          # OBRIGATORIO p/ item 6 (explicacao+recomendacao via LLM); sem ela = fallback rule-based
