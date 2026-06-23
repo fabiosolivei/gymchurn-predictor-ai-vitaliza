@@ -73,3 +73,12 @@ npm run dev
 `GET /observability` expõe agregados in-memory (sem segredos): saúde da API (latência p50/p95, erros, volume), modelo (distribuição de score, buckets de risco, **drift** das features vs baseline de treino) e LLM (chamadas, fallback, tokens). O frontend tem uma aba dedicada **Observabilidade** que faz polling desse endpoint.
 
 Camada **gerenciada (opcional)**: setando `OTEL_EXPORTER_OTLP_ENDPOINT` + `OTEL_EXPORTER_OTLP_HEADERS` (Grafana Cloud OTLP), o backend exporta métricas via OpenTelemetry. O import é **guardado** atrás dessas envs — sem elas, nada de OTel é carregado (não pesa no free tier).
+
+### Ligar o Grafana Cloud (opcional)
+
+1. Conta free em [grafana.com](https://grafana.com) → seu stack → **Connections / OpenTelemetry (OTLP)**.
+2. Copie o **OTLP endpoint** (ex.: `https://otlp-gateway-<region>.grafana.net/otlp`) e gere o token (instance ID + API token).
+3. No Render → serviço → **Environment**, adicione:
+   - `OTEL_EXPORTER_OTLP_ENDPOINT` = o endpoint OTLP
+   - `OTEL_EXPORTER_OTLP_HEADERS` = `Authorization=Basic <base64(instanceID:token)>`
+4. Salve (redeploy). Confirme em `…/observability` → `otlp_enabled: true` (a badge do dashboard vira "configurado"). As métricas (`churn_score`, `predict_latency_ms`, `predictions_total` por risco/fonte) passam a aparecer no Grafana.
