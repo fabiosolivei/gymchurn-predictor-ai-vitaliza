@@ -1,0 +1,18 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Python / backend (modelos .pkl e data/*.csv SAO versionados — Render precisa deles)
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# workflow Pages nao versionado (token gh sem escopo workflow; deploy via branch gh-pages)
+.github/
