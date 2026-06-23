@@ -50,8 +50,12 @@ npm run dev
 
 ## Deploy
 
-- **Backend → Render** (web service): `render.yaml` na raiz (`rootDir: backend`, start `uvicorn app:app --host 0.0.0.0 --port $PORT`). Setar `FRONTEND_ORIGIN`.
+- **Backend → Render** (web service): `render.yaml` na raiz (`rootDir: backend`, start `uvicorn app:app --host 0.0.0.0 --port $PORT`).
 - **Frontend → GitHub Pages**: `npm run build` com `VITE_BASE=/<repo>/` e `VITE_API_URL=<url-do-render>`; publicar `dist/`.
+
+**⚠️ Ressalvas (senão 100% das predições falham em produção):**
+- `VITE_API_URL` **deve ser https** (a página do Pages é https; chamar http é bloqueado por *mixed-content*). Use a URL https do Render, sem barra final.
+- No Render, setar `FRONTEND_ORIGIN = https://<user>.github.io` (**só scheme+host**, sem o path do repo e sem barra final) — senão o backend bloqueia por CORS.
 
 ## Arquitetura
 

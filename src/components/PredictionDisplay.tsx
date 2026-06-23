@@ -70,7 +70,7 @@ export const PredictionDisplay = ({ result }: PredictionDisplayProps) => {
 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
         <h4 className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
-          <Target size={14} className="text-indigo-600" /> Importância das Variáveis (Local)
+          <Target size={14} className="text-indigo-600" /> Fatores deste cliente (SHAP normalizado)
         </h4>
         <div className="space-y-3">
           {result.featureImportance.slice(0, 4).map((fi, i) => (
@@ -78,7 +78,7 @@ export const PredictionDisplay = ({ result }: PredictionDisplayProps) => {
               <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
                 <span>{fi.feature}</span>
                 <span className={fi.impact > 0 ? 'text-rose-500' : 'text-emerald-500'}>
-                  {fi.impact > 0 ? '+' : ''}{(fi.impact * 100).toFixed(0)}% Impacto no Churn
+                  {fi.impact > 0 ? '↑ aumenta risco' : '↓ reduz risco'} · peso {(Math.abs(fi.impact) * 100).toFixed(0)}%
                 </span>
               </div>
               <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">

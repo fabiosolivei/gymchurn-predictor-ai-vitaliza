@@ -279,18 +279,18 @@ export const ModelSpecsView = () => {
           </div>
           <div className="space-y-2">
             <h5 className="font-extrabold text-slate-900 flex items-center justify-between">
-              1. Correção de Data Leakage
-              <span className="text-[9px] font-black bg-rose-50 text-rose-600 px-2 py-0.5 rounded uppercase">Alta Prioridade</span>
+              1. Auditoria de Data Leakage
+              <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase">Auditado</span>
             </h5>
             <p className="text-xs text-slate-500 leading-relaxed font-semibold">
-              A coluna <code className="text-rose-600 bg-rose-50/50 px-1 py-0.5 rounded text-[10px] font-bold">Avg_class_frequency_current_month</code> foi <span className="text-rose-600 font-bold">excluída (drop)</span> do conjunto preditivo.
+              A coluna <code className="text-emerald-600 bg-emerald-50/50 px-1 py-0.5 rounded text-[10px] font-bold">Avg_class_frequency_current_month</code> foi <span className="text-emerald-600 font-bold">auditada e MANTIDA</span> no conjunto preditivo.
             </p>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Clientes que cancelam têm frequência próxima a zero porque a catraca já foi bloqueada contratualmente ao cancelar, e não por falta espontânea de engajamento. Utilizar essa informação causava acurácia inflada fictícia.
+              Teste de sensibilidade: removê-la (junto de Month_to_end_contract) derruba o ROC-AUC só de 0.983 para 0.949 — sem dependência determinística de informação futura. É estado observável no momento da inferência, não vazamento.
             </p>
           </div>
           <div className="mt-auto pt-2 border-t border-slate-50 flex items-center gap-2 text-emerald-600 text-xs font-bold">
-            <CheckCircle size={14} /> Resolvido com Avg_class_frequency_total
+            <CheckCircle size={14} /> Mantida — 5.0% de importância
           </div>
         </div>
 
@@ -308,11 +308,11 @@ export const ModelSpecsView = () => {
               A classe minoritária Churn corresponde a apenas ~26.5% da base contra ~73.5% de retenção ativa.
             </p>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Se ignorado, o algoritmo aprenderia que todos permanecem ativos. Aplicamos a técnica de <span className="font-semibold text-slate-700">Oversampling sintético (SMOTE)</span> no treino e instanciamos o motor compensando classes por pesos proporcionais (<code className="text-[10px] bg-slate-50 border px-1 rounded">class_weight='balanced'</code>).
+              O XGBoost foi tunado com <code className="text-[10px] bg-slate-50 border px-1 rounded">scale_pos_weight=1</code> (sem oversampling/SMOTE). O GridSearchCV também testou peso 2.77; o campeão, escolhido por ROC-AUC, ficou com peso 1 — e é avaliado por métricas honestas para classe desbalanceada (PR-AUC 0.966, recall-churn 89.2%).
             </p>
           </div>
           <div className="mt-auto pt-2 border-t border-slate-50 flex items-center gap-2 text-emerald-600 text-xs font-bold">
-            <CheckCircle size={14} /> Calibrado e sem viés de acurácia
+            <CheckCircle size={14} /> Avaliado por PR-AUC e recall (não só acurácia)
           </div>
         </div>
 
@@ -377,7 +377,7 @@ export const ModelSpecsView = () => {
             </div>
           </div>
           <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
-            <span>Treinamento, SMOTE & Calibração de Hiperparâmetros</span>
+            <span>Treinamento & Calibração de Hiperparâmetros (GridSearchCV)</span>
             <span>Avaliação de Métricas Finais e Matriz de Confusão</span>
           </div>
         </div>
@@ -410,7 +410,7 @@ export const ModelSpecsView = () => {
               </p>
               <div className="text-[11px] text-slate-500 flex gap-1 items-center bg-white px-3 py-1.5 rounded-lg border">
                 <CheckCircle size={12} className="text-emerald-500" />
-                <span>Pontuação média de acurácia de cross-validation: <strong className="text-emerald-600">86.9% (+/- 0.6%)</strong></span>
+                <span>ROC-AUC média na validação cruzada (5-fold): <strong className="text-emerald-600">0.982</strong> ≈ teste 0.983 (sem overfit)</span>
               </div>
             </div>
           </div>
@@ -588,7 +588,7 @@ export const ModelSpecsView = () => {
             <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md flex items-center justify-between border border-slate-800">
               <div className="space-y-1">
                 <span className="text-[10px] font-black tracking-widest uppercase text-slate-400">Previsão Final de Churn f(x)</span>
-                <p className="text-xs font-semibold text-slate-300">Sumatório de contribuições SHAP calibrado pós-SMOTE.</p>
+                <p className="text-xs font-semibold text-slate-300">Soma de contribuições SHAP (log-odds) — simulação didática, não a saída do modelo servido.</p>
               </div>
               <div className="text-right">
                 <span className={cn(
@@ -758,7 +758,7 @@ export const ModelSpecsView = () => {
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 md:col-span-1 space-y-6">
           <div className="space-y-1">
             <h4 className="text-lg font-black text-slate-800">Resultado da Matriz de Confusão</h4>
-            <p className="text-xs text-slate-500 font-semibold">Projeção simulada baseada em teste de validação pós-SMOTE.</p>
+            <p className="text-xs text-slate-500 font-semibold">Projeção ilustrativa (didática), não a saída do modelo servido.</p>
           </div>
           
           <div className="grid grid-cols-2 gap-3">
@@ -798,7 +798,7 @@ export const ModelSpecsView = () => {
               <p className="text-xs text-slate-500 font-semibold">Métricas técnicas derivadas da validação cruzada k-fold balanceada.</p>
             </div>
             <div className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold border border-indigo-100">
-              AUC-ROC: 0.895
+              AUC-ROC: 0.983
             </div>
           </div>
 
@@ -826,11 +826,11 @@ export const ModelSpecsView = () => {
               Importância Global das Features (Feature Importance)
             </h4>
             <p className="text-xs text-slate-500 font-semibold font-sans leading-normal">
-              Grau de relevância e peso contributivo de cada variável no processo de tomada de decisão do Random Forest Classifier (calculado por Mean Decrease in Impurity / Gini Importance).
+              Grau de relevância de cada variável na decisão do XGBoost Classifier (importância por ganho — feature_importances_, servida via /model_card).
             </p>
           </div>
           <div className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold border border-emerald-100 flex items-center gap-1 self-start md:self-center shrink-0">
-            <CheckCircle size={12} /> Métricas Pós-SMOTE
+            <CheckCircle size={12} /> Importância por ganho (XGBoost)
           </div>
         </div>
 
@@ -895,28 +895,28 @@ export const ModelSpecsView = () => {
                   <div className="text-indigo-600 font-black pt-0.5">•</div>
                   <div>
                     <strong className="text-slate-800 block font-bold">Fidelidade (Lifetime) é Suprema:</strong>
-                    Com <strong className="text-indigo-600">28.5%</strong> de importância, a retenção é sustentada principalmente pelo tempo de permanência acumulado, apontando que os 3 primeiros meses de matrícula são a barreira de hábito crucial a ser consolidada.
+                    Com <strong className="text-indigo-600">33.7%</strong> de importância, a retenção é sustentada principalmente pelo tempo de permanência acumulado, apontando que os 3 primeiros meses de matrícula são a barreira de hábito crucial a ser consolidada.
                   </div>
                 </li>
                 <li className="flex gap-2.5">
                   <div className="text-indigo-600 font-black pt-0.5">•</div>
                   <div>
                     <strong className="text-slate-800 block font-bold">Influência Contratual Determinante:</strong>
-                    A duração contratual (<strong className="text-slate-700">Contract_Period</strong> com <strong className="text-indigo-600">22.0%</strong>) e os meses restantes (<strong className="text-indigo-600">16.5%</strong>) criam barreiras financeiras e psicológicas robustas contra evasões impulsivas.
+                    A duração contratual (<strong className="text-slate-700">Contract_period</strong> com <strong className="text-indigo-600">27.3%</strong>) e os meses restantes (<strong className="text-indigo-600">9.7%</strong>) criam barreiras financeiras e psicológicas robustas contra evasões impulsivas.
                   </div>
                 </li>
                 <li className="flex gap-2.5">
                   <div className="text-indigo-600 font-black pt-0.5">•</div>
                   <div>
-                    <strong className="text-slate-800 block font-bold">Frequência Semanal Restaurada:</strong>
-                    Com a remoção cirúrgica de <code className="text-rose-600 text-[10px] font-bold">Avg_class_frequency_current_month</code> (0.0% por Data Leakage), a variável histórica <strong className="text-slate-700">Avg_class_frequency_total</strong> assumiu seu papel legítimo com <strong className="text-indigo-600">14.0%</strong> de relevância informacional, refletindo o real hábito semanal.
+                    <strong className="text-slate-800 block font-bold">Frequência Semanal (mantida e auditada):</strong>
+                    A feature <code className="text-emerald-600 text-[10px] font-bold">Avg_class_frequency_current_month</code> foi MANTIDA (5.0% de importância) após auditoria de vazamento; a histórica <strong className="text-slate-700">Avg_class_frequency_total</strong> contribui com <strong className="text-indigo-600">4.0%</strong>, refletindo o hábito semanal consolidado.
                   </div>
                 </li>
                 <li className="flex gap-2.5">
-                  <div className="text-rose-500 font-black pt-0.5">•</div>
+                  <div className="text-indigo-600 font-black pt-0.5">•</div>
                   <div>
-                    <strong className="text-slate-800 block font-bold">Remoção de Viés com SMOTE:</strong>
-                    O balanceamento sintético de treino assegura que a relevância de atributos de clientes em risco ou estáveis seja avaliada livre do viés de desproporção amostral original (73.5% vs 26.5%).
+                    <strong className="text-slate-800 block font-bold">Desbalanceamento (sem SMOTE):</strong>
+                    A base é 73.5% retenção vs 26.5% churn. O XGBoost campeão usa scale_pos_weight=1 e é avaliado por PR-AUC (0.966) e recall-churn (89.2%) — métricas honestas para classe desbalanceada, sem reamostragem sintética.
                   </div>
                 </li>
               </ul>
@@ -927,7 +927,7 @@ export const ModelSpecsView = () => {
                 <CheckCircle size={14} /> Nota de Governança
               </p>
               <p className="opacity-90 leading-relaxed font-semibold">
-                A soma das importâncias das variáveis ativas totaliza 100%. A variável com vazamento de dados permanece plotada com 0% no gráfico para destacar explicitamente ao time corporativo que a segurança estatística antecede a busca por acurácia fictícia.
+                As importâncias são as do XGBoost campeão (feature_importances_, servidas via /model_card). Nenhuma feature foi removida: a auditoria de vazamento (teste de sensibilidade) mostrou que o modelo não depende de informação futura, garantindo segurança estatística sem sacrificar features legítimas.
               </p>
             </div>
           </div>

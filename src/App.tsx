@@ -274,7 +274,7 @@ export default function App() {
               >
                 <div>
                   <h2 className="text-3xl font-black text-slate-900 tracking-tight">Fronteira & Governança da IA</h2>
-                  <p className="text-slate-500 font-medium font-semibold">Resolução técnica de vazamento de dados, controle de desbalanço amostral e validação teórica</p>
+                  <p className="text-slate-500 font-medium font-semibold">Auditoria de vazamento por teste de sensibilidade (sem remover features), desbalanceamento via scale_pos_weight e validação cruzada</p>
                 </div>
                 <ModelSpecsView />
               </motion.section>
