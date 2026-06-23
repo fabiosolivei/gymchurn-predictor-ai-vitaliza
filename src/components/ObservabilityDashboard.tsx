@@ -9,6 +9,7 @@ import {
   TrendingUp, Sparkles,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { InfoTip } from './ui/InfoTip';
 
 interface Snapshot {
   uptime_s: number;
@@ -44,13 +45,15 @@ const TONES: Record<string, { bg: string; text: string }> = {
   slate: { bg: 'bg-slate-100', text: 'text-slate-600' },
 };
 
-const Stat = ({ icon: Icon, label, value, sub, tone = 'indigo' }: any) => {
+const Stat = ({ icon: Icon, label, value, sub, tone = 'indigo', tip }: any) => {
   const t = TONES[tone] || TONES.indigo;
   return (
     <Card>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+            {label}{tip && <InfoTip term={tip} />}
+          </p>
           <p className="text-3xl font-black text-slate-900 mt-1">{value}</p>
           {sub && <p className="text-xs font-bold text-slate-400 mt-0.5">{sub}</p>}
         </div>
@@ -62,9 +65,9 @@ const Stat = ({ icon: Icon, label, value, sub, tone = 'indigo' }: any) => {
   );
 };
 
-const SectionTitle = ({ icon: Icon, children }: any) => (
+const SectionTitle = ({ icon: Icon, children, tip }: any) => (
   <h3 className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
-    <Icon size={14} className="text-indigo-600" /> {children}
+    <Icon size={14} className="text-indigo-600" /> {children}{tip && <InfoTip term={tip} />}
   </h3>
 );
 
@@ -113,6 +116,7 @@ export const ObservabilityDashboard = () => {
           data.otlp_enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500')}>
           {data.otlp_enabled ? <Cloud size={13} /> : <CloudOff size={13} />}
           {data.otlp_enabled ? 'Grafana Cloud (OTLP) configurado' : 'OTLP desligado — métricas in-memory'}
+          <InfoTip term="otlp" />
         </span>
         <span className="flex items-center gap-2 text-xs font-bold text-slate-400">
           <RefreshCw size={12} /> atualiza a cada {POLL_MS / 1000}s
@@ -138,7 +142,7 @@ export const ObservabilityDashboard = () => {
             sub={`${data.totals.batches} lote(s) · ${data.totals.batch_rows} linhas`} tone="indigo" />
           <Stat icon={Database} label="Total avaliado" value={data.totals.scored_total} sub="individual + lote" tone="violet" />
           <Stat icon={Gauge} label="Latência p50 / p95" value={`${data.latency_ms.p50}ms`}
-            sub={`p95 ${data.latency_ms.p95}ms · max ${data.latency_ms.max}ms`} tone="sky" />
+            sub={`p95 ${data.latency_ms.p95}ms · max ${data.latency_ms.max}ms`} tone="sky" tip="p50_p95" />
           <Stat icon={AlertTriangle} label="Erros" value={data.totals.errors}
             sub={data.totals.errors === 0 ? 'nenhum' : 'verificar logs'} tone={data.totals.errors ? 'rose' : 'emerald'} />
         </div>
@@ -188,7 +192,7 @@ export const ObservabilityDashboard = () => {
 
       {/* DRIFT */}
       <div>
-        <SectionTitle icon={TrendingUp}>Drift das features (janela vs baseline de treino)</SectionTitle>
+        <SectionTitle icon={TrendingUp} tip="drift">Drift das features (janela vs baseline de treino)</SectionTitle>
         <Card>
           {data.drift.length === 0 ? (
             <p className="text-xs font-bold text-slate-400">Sem dados de feature ainda (use o Simulador).</p>
@@ -223,7 +227,7 @@ export const ObservabilityDashboard = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Stat icon={Sparkles} label="Chamadas LLM" value={data.llm.calls} tone="indigo" />
           <Stat icon={CloudOff} label="Fallback (regras)" value={data.llm.fallback}
-            sub={`${data.llm.fallback_rate}% das gerações`} tone={data.llm.fallback_rate > 50 ? 'amber' : 'emerald'} />
+            sub={`${data.llm.fallback_rate}% das gerações`} tone={data.llm.fallback_rate > 50 ? 'amber' : 'emerald'} tip="fallback" />
           <Stat icon={Cpu} label="Tokens (total)" value={data.llm.tokens?.total ?? 0}
             sub={`in ${data.llm.tokens?.prompt ?? 0} · out ${data.llm.tokens?.completion ?? 0}`} tone="violet" />
           <Stat icon={Cloud} label="Export gerenciado" value={data.otlp_enabled ? 'ON' : 'OFF'}

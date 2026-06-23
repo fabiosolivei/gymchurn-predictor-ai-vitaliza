@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { InfoTip } from './ui/InfoTip';
 import { 
   Cpu, 
   ShieldAlert, 
@@ -261,7 +262,7 @@ export const ModelSpecsView = () => {
         <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col items-center flex-shrink-0">
           <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-1">Algoritmo</span>
           <span className="text-lg font-black text-indigo-400">XGBoost Classifier</span>
-          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full mt-2">scale_pos_weight=1</span>
+          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full mt-2 inline-flex items-center gap-1">scale_pos_weight=1<InfoTip term="scale_pos_weight" align="right" tone="dark" /></span>
         </div>
       </div>
 

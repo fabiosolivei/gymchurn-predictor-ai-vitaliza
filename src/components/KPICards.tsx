@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn, formatCurrency, formatPercent } from '../lib/utils';
 import { TrendingUp, TrendingDown, Users, DollarSign, Clock, Target, CreditCard, Activity } from 'lucide-react';
+import { InfoTip } from './ui/InfoTip';
 
 interface KPICardProps {
   title: string;
@@ -10,9 +11,10 @@ interface KPICardProps {
   icon: React.ElementType;
   className?: string;
   id?: string;
+  tip?: string;
 }
 
-export const KPICard = ({ title, value, subtitle, trend, icon: Icon, className }: KPICardProps) => (
+export const KPICard = ({ title, value, subtitle, trend, icon: Icon, className, tip }: KPICardProps) => (
   <div className={cn("bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md hover:border-indigo-100", className)}>
     <div className="flex justify-between items-start mb-4">
       <div className="p-2 bg-slate-50 rounded-lg">
@@ -28,7 +30,7 @@ export const KPICard = ({ title, value, subtitle, trend, icon: Icon, className }
         </span>
       )}
     </div>
-    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</h3>
+    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1">{title}{tip && <InfoTip term={tip} align="right" />}</h3>
     <div className="flex items-baseline gap-2 mt-1">
       <span className="text-2xl font-black text-slate-900">{value}</span>
       {subtitle && <span className="text-xs text-slate-400 font-medium">{subtitle}</span>}
@@ -53,11 +55,11 @@ export const DashboardGrid = ({ searchQuery = '', filters }: DashboardGridProps)
   const cards = [
     { id: 'churn', title: "Taxa de Churn", value: formatPercent(churnBase / 100).replace('0,', ''), trend: { value: 2.1 * multiplier, isPositive: filters.plan === '12' }, icon: Target },
     { id: 'active', title: "Clientes Ativos", value: activeBase.toLocaleString(), subtitle: "/ 4.000 total", icon: Users },
-    { id: 'ltv', title: "LTV Médio", value: formatCurrency(1245 / multiplier), trend: { value: 5.4, isPositive: filters.plan === '12' }, icon: DollarSign },
+    { id: 'ltv', title: "LTV Médio", value: formatCurrency(1245 / multiplier), trend: { value: 5.4, isPositive: filters.plan === '12' }, icon: DollarSign, tip: 'ltv' },
     { id: 'retention', title: "Retenção Geral", value: formatPercent((100 - churnBase) / 100).replace('0,', ''), icon: Clock },
     { id: 'mrr', title: "MRR Estimado", value: formatCurrency(mrrBase), trend: { value: 1.2, isPositive: true }, icon: CreditCard },
     { id: 'cac', title: "CAC Estimado", value: formatCurrency(150 * multiplier), icon: Activity },
-    { id: 'ltv_cac', title: "Rel. LTV/CAC", value: (8.3 / multiplier).toFixed(1) + "x", subtitle: "Ideal > 3x", icon: TrendingUp },
+    { id: 'ltv_cac', title: "Rel. LTV/CAC", value: (8.3 / multiplier).toFixed(1) + "x", subtitle: "Ideal > 3x", icon: TrendingUp, tip: 'ltv_cac' },
     { id: 'revenue', title: "Receita Recorrente", value: formatCurrency(mrrBase / 1000000).replace('R$', '') + 'M', icon: DollarSign },
   ];
 

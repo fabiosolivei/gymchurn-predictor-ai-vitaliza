@@ -3,6 +3,16 @@ import { predictBatch } from '../services/mlModelService';
 import { UploadCloud, Sparkles, AlertTriangle, Download } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'motion/react';
+import { InfoTip } from './ui/InfoTip';
+
+// 13 colunas esperadas (mesma ordem/escala do simulador) — usadas no CSV de exemplo.
+const SAMPLE_COLS = ['gender', 'Near_Location', 'Partner', 'Promo_friends', 'Phone', 'Contract_period',
+  'Group_visits', 'Age', 'Avg_additional_charges_total', 'Month_to_end_contract', 'Lifetime',
+  'Avg_class_frequency_total', 'Avg_class_frequency_current_month'];
+const SAMPLE_ROWS = [
+  [1, 1, 0, 1, 1, 1, 0, 28, 90, 1, 2, 1.5, 0.8],
+  [0, 1, 1, 1, 1, 12, 1, 40, 250, 11, 30, 3.5, 3.4],
+];
 
 interface BatchResult {
   n: number;
@@ -35,6 +45,13 @@ export const BulkUploadForm = () => {
     }
   };
 
+  const downloadSample = () => {
+    const csv = [SAMPLE_COLS.join(','), ...SAMPLE_ROWS.map((r) => r.join(','))].join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'exemplo_lote.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const downloadCsv = () => {
     if (!result) return;
     const rows = result.rows;
@@ -52,7 +69,10 @@ export const BulkUploadForm = () => {
           <div className="bg-indigo-600 p-3 rounded-2xl"><UploadCloud className="text-white" size={24} /></div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">Predição em Lote (Caso A)</h2>
-            <p className="text-sm text-slate-500">Suba um CSV com as 13 features → score + SHAP por linha + recomendação estratégica da base.</p>
+            <p className="text-sm text-slate-500 flex items-center gap-1">
+              Suba um CSV com as 13 features → score + SHAP por linha + recomendação estratégica da base.
+              <InfoTip align="left" text="Use as 13 colunas do dataset, na mesma ordem/escala do simulador. Baixe o 'CSV de exemplo' abaixo para começar com o cabeçalho pronto." />
+            </p>
           </div>
         </div>
         <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-2xl p-8 cursor-pointer hover:border-indigo-300 transition-all">
@@ -60,6 +80,10 @@ export const BulkUploadForm = () => {
           <span className="text-sm font-bold text-slate-600">{file ? file.name : 'Escolher arquivo CSV'}</span>
           <input type="file" accept=".csv" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
         </label>
+        <button type="button" onClick={downloadSample}
+          className="self-start flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 -mt-2">
+          <Download size={14} /> Baixar CSV de exemplo
+        </button>
         <button type="submit" disabled={!file || loading}
           className={cn("w-full py-4 rounded-2xl font-bold text-white transition-all flex items-center justify-center gap-2",
             (!file || loading) ? "bg-slate-300 pointer-events-none" : "bg-gradient-to-r from-indigo-600 to-violet-600 hover:shadow-indigo-200 shadow-lg")}>
