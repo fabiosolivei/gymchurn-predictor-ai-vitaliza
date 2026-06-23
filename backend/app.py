@@ -36,8 +36,10 @@ MAX_CSV_BYTES = 5_000_000
 app = FastAPI(title="Vitaliza Churn API", version="1.1",
               description="Serve o XGBoost serializado (NAO LLM) + SHAP por instancia.")
 
-_origins = [o.strip() for o in os.environ.get(
-    "FRONTEND_ORIGIN", "http://localhost:5173,http://localhost:3000").split(",") if o.strip()]
+# Origens liberadas por padrao (Pages do grupo + dev local). Pode sobrescrever via
+# FRONTEND_ORIGIN (lista separada por virgula) — mas ja funciona sem setar nada.
+_DEFAULT_ORIGINS = "https://fabiosolivei.github.io,http://localhost:5173,http://localhost:3000"
+_origins = [o.strip() for o in os.environ.get("FRONTEND_ORIGIN", _DEFAULT_ORIGINS).split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_origins,
                    allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
 
