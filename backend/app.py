@@ -18,6 +18,7 @@ import io
 import json
 import logging
 import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -32,6 +33,7 @@ from slowapi.util import get_remote_address
 
 import explain as explain_mod
 import inference as inf
+import observability as obs
 
 log = logging.getLogger("vitaliza-api")
 ROOT = Path(__file__).resolve().parent
@@ -56,6 +58,15 @@ MODEL, EXPLAINER, META = inf.load_artifacts()
 FEATURE_ORDER = META["feature_order"]
 _USECOLS = set(FEATURE_ORDER) | {"Churn"}
 
+# baseline de treino (media/desvio das features) p/ o drift — computado 1x no startup
+try:
+    _train = pd.read_csv(ROOT / "data" / "gym_churn_us.csv", usecols=lambda c: c in set(FEATURE_ORDER))
+    obs.set_baseline({f: {"mean": float(_train[f].mean()), "std": float(_train[f].std())}
+                      for f in FEATURE_ORDER if f in _train.columns})
+except Exception:
+    log.warning("baseline de drift indisponivel (dataset de treino ausente)")
+obs.init_otlp()   # liga export OTLP -> Grafana Cloud SE OTEL_EXPORTER_OTLP_ENDPOINT existir
+
 
 class CustomerFeatures(BaseModel):
     """13 features na escala do dataset (binarias 0/1)."""
@@ -76,6 +87,7 @@ class CustomerFeatures(BaseModel):
 
 @app.exception_handler(Exception)
 async def _unhandled(request: Request, exc: Exception):
+    obs.record_error(request.url.path)
     log.exception("erro interno em %s", request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Erro interno no servico."})
 
@@ -83,6 +95,14 @@ async def _unhandled(request: Request, exc: Exception):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/observability")
+@limiter.limit("30/minute")
+def observability(request: Request):
+    """Agregados in-memory p/ o dashboard dedicado (sem segredos): saude da API,
+    distribuicao de score/risco, drift das features e uso do LLM."""
+    return obs.snapshot()
 
 
 @app.get("/model_card")
@@ -111,9 +131,16 @@ def model_card():
 @limiter.limit("60/minute")
 def predict(request: Request, payload: CustomerFeatures):
     """Validacao Pydantic -> 422 automatico em tipo/faixa invalidos."""
+    t0 = time.perf_counter()
     try:
-        result = inf.shap_one(MODEL, EXPLAINER, META, payload.model_dump())
+        feats = payload.model_dump()
+        result = inf.shap_one(MODEL, EXPLAINER, META, feats)
         expl = explain_mod.explain(result)
+        usage = expl.pop("_usage", None)
+        obs.record_prediction(result["churn_probability"], result["risk"],
+                              (time.perf_counter() - t0) * 1000.0, expl["fonte"],
+                              features=feats, source="individual")
+        obs.record_llm_tokens(usage)
         return {**result, **expl}
     except (ValueError, AssertionError) as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -123,6 +150,7 @@ def predict(request: Request, payload: CustomerFeatures):
 @limiter.limit("10/minute")
 async def predict_batch(request: Request, file: UploadFile = File(...)):
     raw = await file.read()
+    t0 = time.perf_counter()
     if len(raw) > MAX_CSV_BYTES:
         raise HTTPException(status_code=413, detail=f"CSV maior que {MAX_CSV_BYTES} bytes.")
     try:
@@ -164,6 +192,10 @@ async def predict_batch(request: Request, file: UploadFile = File(...)):
                "pct_risco": (100.0 * em_risco / n) if n else 0.0,
                "top_drivers": drv.most_common(5)}
     agg = explain_mod.explain_batch_aggregate(profile)
+    obs.record_batch(scored["pred_churn_probability"].tolist(),
+                     scored["pred_risk_bucket"].tolist(),
+                     (time.perf_counter() - t0) * 1000.0, agg["fonte"])
+    obs.record_llm_tokens(agg.pop("_usage", None))
     return {"n": n, "em_risco": em_risco, "distribuicao": counts, "resumo": resumo,
             "recomendacao_agregada": agg["recomendacao_agregada"], "fonte": agg["fonte"],
             "rows": json.loads(scored.to_json(orient="records"))}

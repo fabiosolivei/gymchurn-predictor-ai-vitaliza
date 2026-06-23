@@ -119,3 +119,10 @@ export async function getModelCard(): Promise<any> {
   if (!resp.ok) throw new Error(`Backend ${resp.status}`);
   return resp.json();
 }
+
+// Observabilidade: agregados in-memory (saude da API, distribuicao de score/risco, drift, LLM).
+export async function getObservability(): Promise<any> {
+  const resp = await fetch(`${API}/observability`);
+  if (!resp.ok) throw new Error(`Backend ${resp.status}`);
+  return resp.json();
+}

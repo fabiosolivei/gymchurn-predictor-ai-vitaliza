@@ -15,3 +15,7 @@ services:
         sync: false          # ex: https://fabiosolivei.github.io
       - key: OPENROUTER_API_KEY
         sync: false          # OBRIGATORIO p/ item 6 (explicacao+recomendacao via LLM); sem ela = fallback rule-based
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false          # opcional: gateway OTLP do Grafana Cloud -> liga a observabilidade gerenciada
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false          # ex: Authorization=Basic <base64(instanceID:token)> do Grafana Cloud

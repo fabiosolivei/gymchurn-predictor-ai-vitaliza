@@ -8,6 +8,7 @@ import { PredictionDisplay } from './components/PredictionDisplay';
 import { EDAView } from './components/EDAView';
 import { ModelSpecsView } from './components/ModelSpecsView';
 import { BulkUploadForm } from './components/BulkUploadForm';
+import { ObservabilityDashboard } from './components/ObservabilityDashboard';
 import { 
   Building2, 
   LayoutDashboard, 
@@ -19,12 +20,13 @@ import {
   ShieldCheck,
   Search,
   Settings,
-  Layers
+  Layers,
+  Activity
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
-export type Tab = 'dashboard' | 'eda' | 'simulator' | 'batch' | 'model';
+export type Tab = 'dashboard' | 'eda' | 'simulator' | 'batch' | 'model' | 'observability';
 
 export interface GlobalFilters {
   gender: 'All' | 'Male' | 'Female';
@@ -84,6 +86,7 @@ export default function App() {
             { id: 'simulator', label: 'Simulador Preditivo', icon: BrainCircuit },
             { id: 'batch', label: 'Análise em Lote', icon: Layers },
             { id: 'model', label: 'Fronteira & Governança da IA', icon: ShieldCheck },
+            { id: 'observability', label: 'Observabilidade', icon: Activity },
           ].map((item) => (
             <button
               key={item.id}
@@ -296,6 +299,22 @@ export default function App() {
                   <p className="text-slate-500 font-medium font-semibold">Auditoria de vazamento por teste de sensibilidade (sem remover features), desbalanceamento via scale_pos_weight e validação cruzada</p>
                 </div>
                 <ModelSpecsView />
+              </motion.section>
+            )}
+
+            {activeTab === 'observability' && (
+              <motion.section
+                key="observability"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-8"
+              >
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">Observabilidade</h2>
+                  <p className="text-slate-500 font-medium">Saúde da API, monitoramento do modelo (score, drift) e uso do LLM — em tempo real</p>
+                </div>
+                <ObservabilityDashboard />
               </motion.section>
             )}
           </AnimatePresence>

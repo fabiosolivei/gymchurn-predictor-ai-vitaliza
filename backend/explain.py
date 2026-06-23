@@ -72,11 +72,12 @@ _ACTION = {
 
 
 # ---- LLM (OpenRouter via SDK OpenAI; OpenLIT instrumenta) ------------------
-def _llm_json(system: str, user: str, max_tokens: int = 400) -> dict | None:
-    """Chama o OpenRouter pedindo JSON. None se sem chave / erro."""
+def _llm_json(system: str, user: str, max_tokens: int = 400) -> tuple[dict | None, dict]:
+    """Chama o OpenRouter pedindo JSON. Retorna (obj|None, usage_tokens). O usage e LOCAL
+    (sem estado de modulo) -> sem race de tokens entre requests concorrentes no threadpool."""
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
-        return None
+        return None, {}
     try:
         from openai import OpenAI
         client = OpenAI(base_url=OPENROUTER_BASE, api_key=key)
@@ -85,13 +86,19 @@ def _llm_json(system: str, user: str, max_tokens: int = 400) -> dict | None:
             messages=[{"role": "system", "content": system},
                       {"role": "user", "content": user}],
         )
+        usage = {}
+        u = getattr(resp, "usage", None)
+        if u is not None:
+            usage = {"prompt": getattr(u, "prompt_tokens", 0) or 0,
+                     "completion": getattr(u, "completion_tokens", 0) or 0,
+                     "total": getattr(u, "total_tokens", 0) or 0}
         txt = (resp.choices[0].message.content or "").strip()
         if txt.startswith("```"):
             txt = txt.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
         obj = json.loads(txt)
-        return obj if isinstance(obj, dict) else None   # nao-dict -> fallback (evita 500)
+        return (obj if isinstance(obj, dict) else None), usage   # nao-dict -> fallback (evita 500)
     except Exception:
-        return None
+        return None, {}
 
 
 # ---- individual (Caso B) --------------------------------------------------
@@ -125,7 +132,7 @@ def explain_llm(result: dict) -> dict[str, Any]:
     fatores = "\n".join(
         f"- {c['feature']}: shap={c['shap']:+.3f} ({'aumenta' if c['shap'] > 0 else 'reduz'} risco)"
         for c in result.get("top", []))
-    data = _llm_json(
+    data, usage = _llm_json(
         "Voce e analista de retencao de uma academia. Seja conciso e pratico.",
         ("Probabilidade de churn deste aluno: "
          f"{result['churn_probability']*100:.0f}% ({result['risk']}). Fatores SHAP:\n{fatores}\n\n"
@@ -138,7 +145,8 @@ def explain_llm(result: dict) -> dict[str, Any]:
     rec = str(data.get("recomendacao", "")).strip()
     if not explic or not rec:
         return base
-    return {"explicacao": explic, "recomendacao": rec, "fonte": f"llm:{LLM_MODEL}"}
+    return {"explicacao": explic, "recomendacao": rec, "fonte": f"llm:{LLM_MODEL}",
+            "_usage": usage}
 
 
 def explain(result: dict, use_llm: bool = True) -> dict[str, Any]:
@@ -171,7 +179,7 @@ def explain_batch_aggregate(profile: dict) -> dict[str, Any]:
     if not profile.get("top_drivers"):           # sem fator dominante -> nao arrisca alucinacao do LLM
         return fallback
     drivers = ", ".join(f"{f} ({c}x)" for f, c in profile.get("top_drivers", [])[:5])
-    data = _llm_json(
+    data, usage = _llm_json(
         "Voce e analista de retencao de uma academia. Recomendacoes acionaveis para a GESTAO.",
         (f"Lote de {profile['n']} clientes; {profile['em_risco']} em risco "
          f"({profile['pct_risco']:.0f}%). Distribuicao de risco: {profile.get('distribuicao')}. "
@@ -185,7 +193,9 @@ def explain_batch_aggregate(profile: dict) -> dict[str, Any]:
     if isinstance(rec, list):                       # o LLM as vezes devolve uma lista
         rec = " ".join(f"{i}) {str(x).strip()}." for i, x in enumerate(rec, 1) if str(x).strip())
     rec = str(rec).strip()
-    return {"recomendacao_agregada": rec, "fonte": f"llm:{LLM_MODEL}"} if rec else fallback
+    if not rec:
+        return fallback
+    return {"recomendacao_agregada": rec, "fonte": f"llm:{LLM_MODEL}", "_usage": usage}
 
 
 if __name__ == "__main__":

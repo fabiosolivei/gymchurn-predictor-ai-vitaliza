@@ -63,6 +63,13 @@ npm run dev
 [React/Vite] --POST /predict, /predict_batch--> [FastAPI]
   simulador / model specs                         ├─ champion_xgboost.pkl (Pipeline XGBoost, sem scaler)
                                                    ├─ shap_explainer.pkl (TreeExplainer, SHAP por instância)
-                                                   └─ explain.py (rule-based → OpenRouter opcional)
-   <-- {churn_probability, risk, shap[], explicacao, prescricao} --
+                                                   ├─ explain.py (LLM via OpenRouter; rule-based = fallback)
+                                                   └─ observability.py (agregados in-memory + OTLP opcional)
+   <-- {churn_probability, risk, shap[], explicacao, recomendacao, fonte} --
 ```
+
+## Observabilidade
+
+`GET /observability` expõe agregados in-memory (sem segredos): saúde da API (latência p50/p95, erros, volume), modelo (distribuição de score, buckets de risco, **drift** das features vs baseline de treino) e LLM (chamadas, fallback, tokens). O frontend tem uma aba dedicada **Observabilidade** que faz polling desse endpoint.
+
+Camada **gerenciada (opcional)**: setando `OTEL_EXPORTER_OTLP_ENDPOINT` + `OTEL_EXPORTER_OTLP_HEADERS` (Grafana Cloud OTLP), o backend exporta métricas via OpenTelemetry. O import é **guardado** atrás dessas envs — sem elas, nada de OTel é carregado (não pesa no free tier).
