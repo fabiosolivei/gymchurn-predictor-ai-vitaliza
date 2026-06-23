@@ -1,0 +1,20 @@
+{
+  "feature_order": [
+    "gender",
+    "Near_Location",
+    "Partner",
+    "Promo_friends",
+    "Phone",
+    "Contract_period",
+    "Group_visits",
+    "Age",
+    "Avg_additional_charges_total",
+    "Month_to_end_contract",
+    "Lifetime",
+    "Avg_class_frequency_total",
+    "Avg_class_frequency_current_month"
+  ],
+  "base_value": -0.9887467622756958,
+  "champion": "xgboost",
+  "seed": 42
+}

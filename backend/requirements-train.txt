@@ -1,0 +1,4 @@
+# TREINO apenas (gera figuras + serializa modelos). Nao usado no runtime do Render.
+-r requirements.txt
+matplotlib>=3.8
+seaborn>=0.13

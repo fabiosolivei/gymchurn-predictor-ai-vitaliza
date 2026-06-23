@@ -1,0 +1,6 @@
+{
+  "name": "Vitaliza Churn Hub",
+  "description": "Plataforma analítica e preditiva de churn para a Vitaliza, integrando insights de EDA e modelos de IA para retenção de clientes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["Análise de Churn", "Predição com IA", "Dashboard de Retenção"]
+}

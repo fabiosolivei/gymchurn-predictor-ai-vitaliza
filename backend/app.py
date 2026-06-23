@@ -1,0 +1,135 @@
+"""
+Artefato 2 — Serviço web (FastAPI) que serve o MODELO REAL (item 7)
+====================================================================
+
+POST /predict        -> 1 cliente: probabilidade + SHAP por instancia + explicacao
+POST /predict_batch  -> CSV (lote): linhas scored COM SHAP/explicacao por linha + resumo
+GET  /model_card     -> metricas reais + bloco de overfit (item 3) + importancia (item 5)
+GET  /health         -> status
+
+Deploy "caso 2": ferramenta interna, servidor simples. Modelo carregado UMA vez no
+startup. CORS restrito por env. Rodar (Render): uvicorn app:app --host 0.0.0.0 --port $PORT
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import logging
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+import explain as explain_mod
+import inference as inf
+
+log = logging.getLogger("vitaliza-api")
+ROOT = Path(__file__).resolve().parent
+MAX_CSV_BYTES = 5_000_000
+
+app = FastAPI(title="Vitaliza Churn API", version="1.1",
+              description="Serve o XGBoost serializado (NAO LLM) + SHAP por instancia.")
+
+_origins = [o.strip() for o in os.environ.get(
+    "FRONTEND_ORIGIN", "http://localhost:5173,http://localhost:3000").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_origins,
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+
+MODEL, EXPLAINER, META = inf.load_artifacts()
+FEATURE_ORDER = META["feature_order"]
+
+
+class CustomerFeatures(BaseModel):
+    """13 features na escala do dataset (binarias 0/1)."""
+    gender: int = Field(ge=0, le=1)
+    Near_Location: int = Field(ge=0, le=1)
+    Partner: int = Field(ge=0, le=1)
+    Promo_friends: int = Field(ge=0, le=1)
+    Phone: int = Field(ge=0, le=1)
+    Contract_period: float = Field(ge=0)
+    Group_visits: int = Field(ge=0, le=1)
+    Age: float = Field(ge=0, le=120)
+    Avg_additional_charges_total: float = Field(ge=0)
+    Month_to_end_contract: float = Field(ge=0)
+    Lifetime: float = Field(ge=0)
+    Avg_class_frequency_total: float = Field(ge=0)
+    Avg_class_frequency_current_month: float = Field(ge=0)
+
+
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception):
+    log.exception("erro interno em %s", request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Erro interno no servico."})
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "model": "champion_xgboost.pkl", "features": len(FEATURE_ORDER),
+            "openrouter_key": bool(os.environ.get("OPENROUTER_API_KEY")), "origins": _origins}
+
+
+@app.get("/model_card")
+def model_card():
+    metrics = json.loads((ROOT / "models" / "metrics.json").read_text(encoding="utf-8"))
+    xgb = metrics.get("models", {}).get("xgboost", {})
+    cv = float(xgb.get("best_cv_roc_auc", 0))
+    test = float(xgb.get("roc_auc", 0))
+    gap = round(test - cv, 4)
+    overfit = {"cv_roc_auc": round(cv, 4), "test_roc_auc": round(test, 4), "gap": gap,
+               "overfit_flag": abs(gap) > 0.03,
+               "conclusao": f"CV {cv:.4f} ~ teste {test:.4f} (gap {gap:+.4f}) -> sem sobreajuste"}
+    clf = inf.get_clf(MODEL)
+    imp = sorted(
+        ({"feature": f, "importance": round(float(v), 4)}
+         for f, v in zip(FEATURE_ORDER, np.ravel(getattr(clf, "feature_importances_", [])))),
+        key=lambda d: d["importance"], reverse=True)
+    leak_path = ROOT / "models" / "leakage_audit.json"
+    leakage = json.loads(leak_path.read_text(encoding="utf-8")) if leak_path.exists() else None
+    return {"meta": META, "metrics": metrics, "overfit": overfit,
+            "feature_importance": imp, "leakage_audit": leakage}
+
+
+@app.post("/predict")
+def predict(payload: CustomerFeatures):
+    """Validacao Pydantic -> 422 automatico em tipo/faixa invalidos."""
+    try:
+        result = inf.shap_one(MODEL, EXPLAINER, META, payload.model_dump())
+        expl = explain_mod.explain(result)
+        return {**result, **expl}
+    except (ValueError, AssertionError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@app.post("/predict_batch")
+async def predict_batch(file: UploadFile = File(...)):
+    raw = await file.read()
+    if len(raw) > MAX_CSV_BYTES:
+        raise HTTPException(status_code=413, detail=f"CSV maior que {MAX_CSV_BYTES} bytes.")
+    try:
+        try:
+            df = pd.read_csv(io.BytesIO(raw))
+        except UnicodeDecodeError:
+            df = pd.read_csv(io.BytesIO(raw), encoding="latin-1")
+        if df.empty:
+            raise HTTPException(status_code=422, detail="CSV sem linhas de dados.")
+        scored = inf.predict_batch(MODEL, EXPLAINER, META, df)
+    except HTTPException:
+        raise
+    except (ValueError, AssertionError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except pd.errors.ParserError as e:
+        raise HTTPException(status_code=422, detail=f"CSV invalido: {e}")
+
+    counts = scored["pred_risk_bucket"].value_counts().to_dict()
+    n = int(len(scored))
+    em_risco = int((scored["pred_churn_probability"] >= inf.THRESHOLD).sum())
+    resumo = (f"{n} clientes avaliados; {em_risco} em risco (prob >= {inf.THRESHOLD}). "
+              "Distribuicao: " + ", ".join(f"{k}: {v}" for k, v in counts.items()) + ".")
+    return {"n": n, "em_risco": em_risco, "distribuicao": counts, "resumo": resumo,
+            "rows": json.loads(scored.to_json(orient="records"))}

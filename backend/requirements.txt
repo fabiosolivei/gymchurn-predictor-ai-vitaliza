@@ -1,0 +1,15 @@
+# RUNTIME (Render web service) — pinado EXATO no ambiente que serializou os .pkl,
+# para o unpickle do XGBoost/SHAP nao falhar no boot. matplotlib/seaborn NAO entram
+# aqui (so train.py usa) — reduz imagem e cold start. Treino: requirements-train.txt.
+fastapi==0.135.2
+uvicorn[standard]==0.34.0
+pydantic==2.12.5
+scikit-learn==1.8.0
+xgboost==3.2.0
+shap==0.51.0
+joblib==1.5.3
+numpy==2.4.3
+scipy==1.17.1
+pandas==3.0.2
+httpx==0.28.1
+python-multipart>=0.0.9

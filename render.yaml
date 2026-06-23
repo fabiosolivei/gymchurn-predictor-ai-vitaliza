@@ -1,0 +1,17 @@
+# Render Blueprint — backend FastAPI (Artefato 2). Frontend vai pro GitHub Pages.
+services:
+  - type: web
+    name: vitaliza-churn-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: FRONTEND_ORIGIN
+        sync: false          # ex: https://fabiosolivei.github.io
+      - key: OPENROUTER_API_KEY
+        sync: false          # opcional (upgrade do item 6)
