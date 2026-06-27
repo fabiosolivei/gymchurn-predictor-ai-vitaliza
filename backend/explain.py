@@ -205,6 +205,23 @@ def explain_batch_aggregate(profile: dict) -> dict[str, Any]:
     return {"recomendacao_agregada": rec, "fonte": f"llm:{LLM_MODEL}", "_usage": usage}
 
 
+def explain_persona_action(persona_nome: str, n: int, drivers_str: str,
+                           fallback_acao: str = "acompanhamento de retencao") -> dict[str, Any]:
+    """Acao de retencao por SEGMENTO/persona (microsegmento) via LLM; fallback rule-based."""
+    fallback = {"persona": persona_nome, "n": n, "acao": fallback_acao, "fonte": "rule-based"}
+    data, usage = _llm_json(
+        "Voce e analista de retencao de academia. De UMA acao curta e acionavel para um SEGMENTO.",
+        (f"Segmento: {persona_nome} ({n} alunos em risco). Fatores SHAP frequentes: {drivers_str or 'variados'}.\n"
+         'Responda ESTRITAMENTE em JSON: {"acao": "1 frase de acao de retencao para ESTE segmento"}.'),
+        max_tokens=120)
+    if not data:
+        return fallback
+    acao = str(data.get("acao", "")).strip()
+    if not acao:
+        return fallback
+    return {"persona": persona_nome, "n": n, "acao": acao, "fonte": f"llm:{LLM_MODEL}", "_usage": usage}
+
+
 if __name__ == "__main__":
     demo = {"churn_probability": 0.82, "risk": "Alto risco", "top": [
         {"feature": "Month_to_end_contract", "shap": 0.31}, {"feature": "Lifetime", "shap": -0.2},

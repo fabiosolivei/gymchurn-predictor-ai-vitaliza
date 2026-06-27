@@ -1,0 +1,91 @@
+{
+  "pr_thresholds": [
+    {
+      "threshold": 0.3,
+      "recall": 0.91,
+      "precision": 0.885,
+      "fn": 19,
+      "fp": 25
+    },
+    {
+      "threshold": 0.35,
+      "recall": 0.91,
+      "precision": 0.894,
+      "fn": 19,
+      "fp": 23
+    },
+    {
+      "threshold": 0.4,
+      "recall": 0.91,
+      "precision": 0.902,
+      "fn": 19,
+      "fp": 21
+    },
+    {
+      "threshold": 0.5,
+      "recall": 0.892,
+      "precision": 0.913,
+      "fn": 23,
+      "fp": 18
+    }
+  ],
+  "errors_by_persona": {
+    "O Inst\u00e1vel": {
+      "n": 330,
+      "fn": 15,
+      "fp": 15
+    },
+    "O Desistente": {
+      "n": 129,
+      "fn": 3,
+      "fp": 1
+    },
+    "O Atleta Consistente": {
+      "n": 224,
+      "fn": 3,
+      "fp": 2
+    },
+    "O Veterano VIP": {
+      "n": 59,
+      "fn": 0,
+      "fp": 0
+    },
+    "O Iniciante Promissor": {
+      "n": 58,
+      "fn": 2,
+      "fp": 0
+    }
+  },
+  "persona_validation": {
+    "O Inst\u00e1vel": {
+      "n": 1658,
+      "ch": 502,
+      "pct_base": 41.5,
+      "churn_rate": 30.3
+    },
+    "O Atleta Consistente": {
+      "n": 1035,
+      "ch": 35,
+      "pct_base": 25.9,
+      "churn_rate": 3.4
+    },
+    "O Iniciante Promissor": {
+      "n": 383,
+      "ch": 7,
+      "pct_base": 9.6,
+      "churn_rate": 1.8
+    },
+    "O Veterano VIP": {
+      "n": 316,
+      "ch": 0,
+      "pct_base": 7.9,
+      "churn_rate": 0.0
+    },
+    "O Desistente": {
+      "n": 608,
+      "ch": 517,
+      "pct_base": 15.2,
+      "churn_rate": 85.0
+    }
+  }
+}

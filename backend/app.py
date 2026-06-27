@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -122,8 +122,10 @@ def model_card():
         key=lambda d: d["importance"], reverse=True)
     leak_path = ROOT / "models" / "leakage_audit.json"
     leakage = json.loads(leak_path.read_text(encoding="utf-8")) if leak_path.exists() else None
+    ana_path = ROOT / "models" / "analysis.json"
+    analysis = json.loads(ana_path.read_text(encoding="utf-8")) if ana_path.exists() else None
     return {"meta": META, "metrics": metrics, "overfit": overfit,
-            "feature_importance": imp, "leakage_audit": leakage,
+            "feature_importance": imp, "leakage_audit": leakage, "analysis": analysis,
             "llm_enabled": bool(os.environ.get("OPENROUTER_API_KEY"))}
 
 
@@ -148,9 +150,10 @@ def predict(request: Request, payload: CustomerFeatures):
 
 @app.post("/predict_batch")
 @limiter.limit("10/minute")
-async def predict_batch(request: Request, file: UploadFile = File(...)):
+async def predict_batch(request: Request, file: UploadFile = File(...), threshold: float = Form(0.5)):
     raw = await file.read()
     t0 = time.perf_counter()
+    thr = min(0.9, max(0.1, float(threshold)))   # ponto de operacao configuravel (default 0.5)
     if len(raw) > MAX_CSV_BYTES:
         raise HTTPException(status_code=413, detail=f"CSV maior que {MAX_CSV_BYTES} bytes.")
     try:
@@ -177,12 +180,12 @@ async def predict_batch(request: Request, file: UploadFile = File(...)):
     from collections import Counter
     counts = scored["pred_risk_bucket"].value_counts().to_dict()
     n = int(len(scored))
-    em_risco = int((scored["pred_churn_probability"] >= inf.THRESHOLD).sum())
-    resumo = (f"{n} clientes avaliados; {em_risco} em risco (prob >= {inf.THRESHOLD}). "
+    em_risco = int((scored["pred_churn_probability"] >= thr).sum())
+    resumo = (f"{n} clientes avaliados; {em_risco} em risco (prob >= {thr}). "
               "Distribuicao: " + ", ".join(f"{k}: {v}" for k, v in counts.items()) + ".")
-    # Caso A: recomendacao AGREGADA via LLM a partir do perfil de risco do lote
+    # Caso A: recomendacao AGREGADA + por SEGMENTO via LLM a partir do perfil de risco do lote
     drv = Counter()
-    em_risco_rows = scored[scored["pred_churn_probability"] >= inf.THRESHOLD]   # so os em risco
+    em_risco_rows = scored[scored["pred_churn_probability"] >= thr]   # so os em risco (no corte)
     for s in em_risco_rows["pred_top_drivers"]:
         for part in str(s).split(";"):
             part = part.strip()
@@ -193,10 +196,26 @@ async def predict_batch(request: Request, file: UploadFile = File(...)):
                "pct_risco": (100.0 * em_risco / n) if n else 0.0,
                "top_drivers": drv.most_common(5), "personas": personas_risco}
     agg = explain_mod.explain_batch_aggregate(profile)
+    obs.record_llm_tokens(agg.pop("_usage", None))
+    # Personalizacao por MICROSEGMENTO: 1 acao LLM por persona dominante entre os em-risco (cap 3)
+    recs_persona = []
+    for pnome, cnt in list(personas_risco.items())[:3]:
+        sub = em_risco_rows[em_risco_rows["pred_persona"] == pnome]
+        dc = Counter()
+        for s in sub["pred_top_drivers"]:
+            for part in str(s).split(";"):
+                part = part.strip()
+                if part.endswith("(+)"):
+                    dc[part[:-3].strip()] += 1
+        pilar = inf._PERSONAS.get(pnome, (0, "acompanhamento de retencao"))[1]
+        rp = explain_mod.explain_persona_action(pnome, int(cnt),
+                                                 ", ".join(f for f, _ in dc.most_common(3)), fallback_acao=pilar)
+        obs.record_llm_tokens(rp.pop("_usage", None))
+        recs_persona.append(rp)
     obs.record_batch(scored["pred_churn_probability"].tolist(),
                      scored["pred_risk_bucket"].tolist(),
                      (time.perf_counter() - t0) * 1000.0, agg["fonte"])
-    obs.record_llm_tokens(agg.pop("_usage", None))
-    return {"n": n, "em_risco": em_risco, "distribuicao": counts, "resumo": resumo,
+    return {"n": n, "em_risco": em_risco, "threshold": thr, "distribuicao": counts, "resumo": resumo,
             "recomendacao_agregada": agg["recomendacao_agregada"], "fonte": agg["fonte"],
+            "recomendacoes_por_persona": recs_persona,
             "rows": json.loads(scored.to_json(orient="records"))}
