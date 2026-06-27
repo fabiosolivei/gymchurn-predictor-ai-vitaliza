@@ -53,10 +53,10 @@ export const DashboardGrid = ({ searchQuery = '', filters }: DashboardGridProps)
   const mrrBase = 284000 * (filters.plan === '12' ? 1.2 : 0.8);
 
   const cards = [
-    { id: 'churn', title: "Taxa de Churn", value: formatPercent(churnBase / 100).replace('0,', ''), trend: { value: 2.1 * multiplier, isPositive: filters.plan === '12' }, icon: Target },
+    { id: 'churn', title: "Taxa de Churn", value: formatPercent(churnBase), trend: { value: 2.1 * multiplier, isPositive: filters.plan === '12' }, icon: Target },
     { id: 'active', title: "Clientes Ativos", value: activeBase.toLocaleString(), subtitle: "/ 4.000 total", icon: Users },
     { id: 'ltv', title: "LTV Médio", value: formatCurrency(1245 / multiplier), trend: { value: 5.4, isPositive: filters.plan === '12' }, icon: DollarSign, tip: 'ltv' },
-    { id: 'retention', title: "Retenção Geral", value: formatPercent((100 - churnBase) / 100).replace('0,', ''), icon: Clock },
+    { id: 'retention', title: "Retenção Geral", value: formatPercent(100 - churnBase), icon: Clock },
     { id: 'mrr', title: "MRR Estimado", value: formatCurrency(mrrBase), trend: { value: 1.2, isPositive: true }, icon: CreditCard },
     { id: 'cac', title: "CAC Estimado", value: formatCurrency(150 * multiplier), icon: Activity },
     { id: 'ltv_cac', title: "Rel. LTV/CAC", value: (8.3 / multiplier).toFixed(1) + "x", subtitle: "Ideal > 3x", icon: TrendingUp, tip: 'ltv_cac' },

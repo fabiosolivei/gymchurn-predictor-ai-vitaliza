@@ -1,0 +1,58 @@
+{
+  "method": "xgboost_gain (clf.feature_importances_)",
+  "note": "importancia por GANHO do XGBoost (nao SHAP)",
+  "feature_importance": [
+    {
+      "feature": "Lifetime",
+      "importance_gain": 0.3372
+    },
+    {
+      "feature": "Contract_period",
+      "importance_gain": 0.2733
+    },
+    {
+      "feature": "Month_to_end_contract",
+      "importance_gain": 0.0967
+    },
+    {
+      "feature": "Age",
+      "importance_gain": 0.0681
+    },
+    {
+      "feature": "Avg_class_frequency_current_month",
+      "importance_gain": 0.0499
+    },
+    {
+      "feature": "Group_visits",
+      "importance_gain": 0.0427
+    },
+    {
+      "feature": "Avg_class_frequency_total",
+      "importance_gain": 0.0403
+    },
+    {
+      "feature": "Promo_friends",
+      "importance_gain": 0.0208
+    },
+    {
+      "feature": "Avg_additional_charges_total",
+      "importance_gain": 0.0195
+    },
+    {
+      "feature": "Phone",
+      "importance_gain": 0.0147
+    },
+    {
+      "feature": "Near_Location",
+      "importance_gain": 0.0142
+    },
+    {
+      "feature": "gender",
+      "importance_gain": 0.0132
+    },
+    {
+      "feature": "Partner",
+      "importance_gain": 0.0093
+    }
+  ]
+}

@@ -188,9 +188,10 @@ async def predict_batch(request: Request, file: UploadFile = File(...)):
             part = part.strip()
             if part.endswith("(+)"):
                 drv[part[:-3].strip()] += 1
+    personas_risco = em_risco_rows["pred_persona"].value_counts().head(5).to_dict() if "pred_persona" in em_risco_rows else {}
     profile = {"n": n, "em_risco": em_risco, "distribuicao": counts,
                "pct_risco": (100.0 * em_risco / n) if n else 0.0,
-               "top_drivers": drv.most_common(5)}
+               "top_drivers": drv.most_common(5), "personas": personas_risco}
     agg = explain_mod.explain_batch_aggregate(profile)
     obs.record_batch(scored["pred_churn_probability"].tolist(),
                      scored["pred_risk_bucket"].tolist(),

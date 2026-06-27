@@ -132,12 +132,15 @@ def explain_llm(result: dict) -> dict[str, Any]:
     fatores = "\n".join(
         f"- {c['feature']}: shap={c['shap']:+.3f} ({'aumenta' if c['shap'] > 0 else 'reduz'} risco)"
         for c in result.get("top", []))
+    p = result.get("persona") or {}
+    seg = (f"Segmento (persona) deste aluno: {p['nome']} (churn-base ~{p['churn_base']}%; "
+           f"estrategia de retencao do negocio: {p['pilar']}). ") if p else ""
     data, usage = _llm_json(
         "Voce e analista de retencao de uma academia. Seja conciso e pratico.",
-        ("Probabilidade de churn deste aluno: "
+        (seg + "Probabilidade de churn deste aluno: "
          f"{result['churn_probability']*100:.0f}% ({result['risk']}). Fatores SHAP:\n{fatores}\n\n"
          'Responda ESTRITAMENTE em JSON: {"explicacao": "2-3 frases sobre POR QUE o risco e esse", '
-         '"recomendacao": "1-2 acoes concretas de retencao para este aluno"}. '
+         '"recomendacao": "1-2 acoes concretas de retencao alinhadas a estrategia da persona"}. '
          "Em portugues, sem inventar dados alem dos fatores."))
     if not data:
         return base
@@ -179,13 +182,17 @@ def explain_batch_aggregate(profile: dict) -> dict[str, Any]:
     if not profile.get("top_drivers"):           # sem fator dominante -> nao arrisca alucinacao do LLM
         return fallback
     drivers = ", ".join(f"{f} ({c}x)" for f, c in profile.get("top_drivers", [])[:5])
+    personas = profile.get("personas") or {}
+    seg = ("Personas (segmentos) dominantes entre os em-risco: "
+           + ", ".join(f"{k} ({v})" for k, v in personas.items()) + ". ") if personas else ""
     data, usage = _llm_json(
         "Voce e analista de retencao de uma academia. Recomendacoes acionaveis para a GESTAO.",
         (f"Lote de {profile['n']} clientes; {profile['em_risco']} em risco "
          f"({profile['pct_risco']:.0f}%). Distribuicao de risco: {profile.get('distribuicao')}. "
-         f"Fatores SHAP mais frequentes entre os em risco: {drivers}.\n\n"
+         + seg
+         + f"Fatores SHAP mais frequentes entre os em risco: {drivers}.\n\n"
          'Responda ESTRITAMENTE em JSON: {"recomendacao_agregada": "3-4 acoes estrategicas '
-         'priorizadas para reduzir o churn DESTA base"}. Em portugues, baseado so nos fatores.'),
+         'priorizadas por PERSONA para reduzir o churn DESTA base"}. Em portugues, baseado so nos fatores.'),
         max_tokens=450)
     if not data:
         return fallback

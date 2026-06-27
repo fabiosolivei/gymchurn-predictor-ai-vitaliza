@@ -57,6 +57,44 @@ def risk_bucket(prob: float) -> tuple[str, str]:
     return "Risco crítico", "#e74c3c"
 
 
+# As 5 personas do EDA (Semana 5, K-Means sobre Lifetime/Contract_period/frequencia/Freq_diff)
+# aproximadas por REGRA sobre os mesmos drivers. Servem para injetar o SEGMENTO no briefing do
+# LLM (alinhamento com a trilha de negocio) e rotular cada cliente no lote. churn-base = taxa
+# observada da persona no EDA; pilar = estrategia de retencao do board deck.
+_PERSONAS = {
+    "O Desistente":          (99.8, "Monitoramento Preditivo: re-engajamento imediato com prova de progresso"),
+    "O Instável":            (31.7, "Conversao Estrategica: upsell holistico / migracao para plano anual"),
+    "O Iniciante Promissor": (6.6,  "Onboarding Social: comunidade e pertencimento nos primeiros 90 dias"),
+    "O Atleta Consistente":  (2.0,  "Fidelizacao: biomonitoramento e performance"),
+    "O Veterano VIP":        (0.3,  "Advocacy: proposito, mentoria e longevidade"),
+}
+
+
+def persona_for(row: dict) -> dict:
+    """Rotula o aluno em 1 das 5 personas do EDA (regra sobre Lifetime/Contract_period/frequencia).
+    Ordem: do mais critico ao mais retido. Retorna {nome, churn_base, pilar}."""
+    def g(k):
+        try:
+            return float(row.get(k, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    lt, cp = g("Lifetime"), g("Contract_period")
+    fcur, ftot = g("Avg_class_frequency_current_month"), g("Avg_class_frequency_total")
+    drop = ftot - fcur                                   # Freq_diff (o "termometro" do negocio)
+    if lt <= 1.5 and (fcur < 1.0 or drop > 0.4):
+        nome = "O Desistente"
+    elif lt >= 10:
+        nome = "O Veterano VIP"
+    elif cp >= 6 and fcur >= 1.5:                        # contrato longo = ancora (Atleta)
+        nome = "O Atleta Consistente"
+    elif lt >= 3 and fcur >= 2.0:                        # novo mas engajado (Iniciante)
+        nome = "O Iniciante Promissor"
+    else:
+        nome = "O Instável"
+    base, pilar = _PERSONAS[nome]
+    return {"nome": nome, "churn_base": base, "pilar": pilar}
+
+
 def _frame(rows, feature_order: list[str]) -> pd.DataFrame:
     """DataFrame reordenado p/ FEATURE_ORDER, coercao numerica e rejeicao de NaN."""
     df = pd.DataFrame(rows)
@@ -111,6 +149,7 @@ def shap_one(model, explainer, meta: dict, row: dict) -> dict:
         "risk": label,
         "risk_color": color,
         "base_value": round(base, 4),
+        "persona": persona_for(row),
         "shap": contribs,
         "top": contribs[:5],
     }
@@ -127,16 +166,18 @@ def predict_batch(model, explainer, meta: dict, df: pd.DataFrame) -> pd.DataFram
     out["pred_churn_prediction"] = (proba >= THRESHOLD).astype(int)
     out["pred_risk_bucket"] = [risk_bucket(p)[0] for p in proba]
 
-    top_strs, explic = [], []
+    top_strs, explic, personas = [], [], []
     vals = np.asarray(exp.values)
     for i in range(len(X)):
         contribs = _contribs(feature_order, vals[i], X.iloc[i])
         top3 = contribs[:3]
         top_strs.append("; ".join(f"{c['feature']}({'+' if c['shap'] > 0 else '-'})" for c in top3))
+        personas.append(persona_for(X.iloc[i].to_dict())["nome"])
         res = {"churn_probability": round(float(proba[i]), 4),
                "risk": risk_bucket(float(proba[i]))[0], "top": top3}
         explic.append(_explain.explain_rule_based(res)["explicacao"])
     out["pred_top_drivers"] = top_strs
+    out["pred_persona"] = personas
     out["pred_explicacao"] = explic
     return out
 

@@ -231,6 +231,12 @@ def main() -> None:
                    "champion": champion_name, "feature_order": feature_order,
                    "target_balance": df["Churn"].value_counts(normalize=True).round(4).to_dict(),
                    "correlation_with_churn": corr, "models": all_metrics}, f, indent=2, default=str)
+    # importancia por GANHO do XGBoost (reprodutibilidade offline do relatorio; != SHAP)
+    fi = sorted(({"feature": f, "importance_gain": round(float(v), 4)}
+                 for f, v in zip(feature_order, clf.feature_importances_)),
+                key=lambda d: -d["importance_gain"])
+    with open(MODELS / "feature_importance.json", "w", encoding="utf-8") as f:
+        json.dump({"method": "xgboost_gain (clf.feature_importances_)", "feature_importance": fi}, f, indent=2)
 
     # ---- Verificação anti-bug: sum(shap)+base ~= margin (logit) -----------
     row0 = X_test.iloc[[0]]
