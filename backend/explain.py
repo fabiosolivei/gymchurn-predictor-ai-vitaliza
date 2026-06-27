@@ -130,7 +130,7 @@ def explain_rule_based(result: dict) -> dict[str, Any]:
 def explain_llm(result: dict) -> dict[str, Any]:
     base = explain_rule_based(result)
     fatores = "\n".join(
-        f"- {c['feature']}: shap={c['shap']:+.3f} ({'aumenta' if c['shap'] > 0 else 'reduz'} risco)"
+        f"- {c['feature']} = {c.get('value')}: shap={c['shap']:+.3f} ({'aumenta' if c['shap'] > 0 else 'reduz'} risco)"
         for c in result.get("top", []))
     p = result.get("persona") or {}
     seg = (f"Segmento (persona) deste aluno: {p['nome']} (churn-base ~{p['churn_base']}%; "

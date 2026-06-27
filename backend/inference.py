@@ -80,8 +80,8 @@ def persona_for(row: dict) -> dict:
             return 0.0
     lt, cp = g("Lifetime"), g("Contract_period")
     fcur, ftot = g("Avg_class_frequency_current_month"), g("Avg_class_frequency_total")
-    drop = ftot - fcur                                   # Freq_diff (o "termometro" do negocio)
-    if lt <= 1.5 and (fcur < 1.0 or drop > 0.4):
+    drop = ftot - fcur                                   # Freq_diff (o "termometro" do negocio: queda > 0,5)
+    if lt <= 1.5 and (fcur < 1.0 or drop > 0.5):
         nome = "O Desistente"
     elif lt >= 10:
         nome = "O Veterano VIP"
