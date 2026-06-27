@@ -355,7 +355,7 @@ export const ModelSpecsView = () => {
           </div>
           <div className="flex gap-2">
             <span className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
-              75% Treino / 25% Teste
+              80% Treino / 20% Teste
             </span>
             <span className="text-[10px] bg-emerald-50 border border-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
               K-Fold (k=5)
@@ -366,15 +366,15 @@ export const ModelSpecsView = () => {
         {/* Barra de distribuição visual */}
         <div className="space-y-2">
           <div className="flex justify-between text-xs font-bold text-slate-500">
-            <span>Conjunto de Treino (75%)</span>
-            <span>Conjunto de Teste (25%)</span>
+            <span>Conjunto de Treino (80%)</span>
+            <span>Conjunto de Teste (20%)</span>
           </div>
           <div className="h-6 w-full rounded-2xl bg-slate-100 overflow-hidden flex shadow-inner p-1">
-            <div className="h-full bg-indigo-600 rounded-l-xl flex items-center justify-center text-[10px] font-black text-white px-2 transition-all hover:bg-indigo-700" style={{ width: '75%' }}>
-              75% dos Dados (3.000 clientes)
+            <div className="h-full bg-indigo-600 rounded-l-xl flex items-center justify-center text-[10px] font-black text-white px-2 transition-all hover:bg-indigo-700" style={{ width: '80%' }}>
+              80% dos Dados (3.200 clientes)
             </div>
-            <div className="h-full bg-emerald-500 rounded-r-xl flex items-center justify-center text-[10px] font-black text-white px-2 transition-all hover:bg-emerald-600" style={{ width: '25%' }}>
-              25% (1.000 clientes)
+            <div className="h-full bg-emerald-500 rounded-r-xl flex items-center justify-center text-[10px] font-black text-white px-2 transition-all hover:bg-emerald-600" style={{ width: '20%' }}>
+              20% (800 clientes)
             </div>
           </div>
           <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
@@ -389,9 +389,9 @@ export const ModelSpecsView = () => {
               <Layers size={20} />
             </div>
             <div className="space-y-2">
-              <h5 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider">Metodologia Train/Test Split (75% - 25%)</h5>
+              <h5 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider">Metodologia Train/Test Split (80% - 20%)</h5>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Utilizamos <strong className="text-slate-700">75% dos dados históricos (Tempo Zero)</strong> para a fase de ajuste e aprendizado supervisionado (Training Set). Os <strong className="text-slate-700">25% restantes</strong> foram rigorosamente separados como dados inéditos (Holdout Test Set) usados apenas para medir e calcular as métricas reais apresentadas de acurácia, recall e F1-score.
+                Utilizamos <strong className="text-slate-700">80% dos dados históricos (Tempo Zero)</strong> para a fase de ajuste e aprendizado supervisionado (Training Set). Os <strong className="text-slate-700">20% restantes</strong> foram rigorosamente separados como dados inéditos (Holdout Test Set) usados apenas para medir e calcular as métricas reais apresentadas de acurácia, recall e F1-score.
               </p>
               <div className="text-[11px] text-slate-500 flex gap-1 items-center bg-white px-3 py-1.5 rounded-lg border">
                 <CheckCircle size={12} className="text-emerald-500" />
@@ -759,28 +759,28 @@ export const ModelSpecsView = () => {
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 md:col-span-1 space-y-6">
           <div className="space-y-1">
             <h4 className="text-lg font-black text-slate-800">Resultado da Matriz de Confusão</h4>
-            <p className="text-xs text-slate-500 font-semibold">Projeção ilustrativa (didática), não a saída do modelo servido.</p>
+            <p className="text-xs text-slate-500 font-semibold">Holdout de teste (800 amostras / 20%) — saída real do XGBoost campeão (metrics.json).</p>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-slate-50/70 p-4 rounded-xl border border-dashed flex flex-col items-center justify-center text-center">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Verdadeiro Retido</span>
-              <span className="text-xl font-extrabold text-slate-800 mt-1">2.754</span>
+              <span className="text-xl font-extrabold text-slate-800 mt-1">570</span>
               <span className="text-[9px] font-bold text-emerald-500 mt-1 bg-emerald-50 px-1.5 rounded uppercase">True Negative</span>
             </div>
             <div className="bg-rose-50/20 p-4 rounded-xl border border-dashed border-rose-100 flex flex-col items-center justify-center text-center">
               <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Falso Alarme Churn</span>
-              <span className="text-xl font-extrabold text-rose-700 mt-1">184</span>
+              <span className="text-xl font-extrabold text-rose-700 mt-1">18</span>
               <span className="text-[9px] font-bold text-rose-500 mt-1 bg-rose-50 px-1.5 rounded uppercase font-black">False Positive</span>
             </div>
             <div className="bg-amber-50/20 p-4 rounded-xl border border-dashed border-amber-100 flex flex-col items-center justify-center text-center">
               <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Falha de Detecção</span>
-              <span className="text-xl font-extrabold text-amber-700 mt-1">112</span>
+              <span className="text-xl font-extrabold text-amber-700 mt-1">23</span>
               <span className="text-[9px] font-bold text-amber-500 mt-1 bg-amber-50 px-1.5 rounded uppercase font-black">False Negative</span>
             </div>
             <div className="bg-indigo-50/30 p-4 rounded-xl border border-dashed border-indigo-100 flex flex-col items-center justify-center text-center">
               <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Verdadeiro Churn</span>
-              <span className="text-xl font-extrabold text-indigo-800 mt-1">950</span>
+              <span className="text-xl font-extrabold text-indigo-800 mt-1">189</span>
               <span className="text-[9px] font-bold text-indigo-500 mt-1 bg-indigo-50 px-1.5 rounded uppercase font-black">True Positive</span>
             </div>
           </div>

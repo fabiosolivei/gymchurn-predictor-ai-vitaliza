@@ -21,6 +21,7 @@ interface BatchResult {
   resumo: string;
   recomendacao_agregada: string;
   fonte: string;
+  recomendacoes_por_persona?: { persona: string; n: number; acao: string; fonte: string }[];
   rows: any[];
 }
 
@@ -110,6 +111,27 @@ export const BulkUploadForm = () => {
             </h4>
             <p className="text-sm font-medium text-slate-700 leading-relaxed">{result.recomendacao_agregada}</p>
           </div>
+
+          {result.recomendacoes_por_persona && result.recomendacoes_por_persona.length > 0 && (
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-3">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Ação por persona (microsegmento)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {result.recomendacoes_por_persona.map((r, i) => (
+                  <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-black text-slate-800">{r.persona}</span>
+                      <span className="text-[10px] font-bold text-slate-400">{r.n} em risco</span>
+                    </div>
+                    <p className="text-xs font-medium text-slate-600 leading-relaxed">{r.acao}</p>
+                    <span className={cn("inline-block mt-2 text-[9px] font-black px-2 py-0.5 rounded-full",
+                      r.fonte.startsWith('llm') ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600')}>
+                      {r.fonte.startsWith('llm') ? 'IA / LLM' : 'regras'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
             <div className="flex items-center justify-between">
