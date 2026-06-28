@@ -13,6 +13,33 @@ if (typeof location !== "undefined" && location.protocol === "https:" && API.sta
   );
 }
 
+// O backend (Render free) hiberna apos ~15min sem trafego. Aquece a API assim que o app
+// carrega para o cold start comecar ANTES do usuario clicar em prever (evita "Failed to fetch").
+export function warmUp(): void {
+  fetch(`${API}/health`, { method: "GET", cache: "no-store" }).catch(() => {});
+}
+warmUp();
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// fetch resiliente a cold start: em falha de REDE (TypeError "Failed to fetch"), espera e tenta
+// de novo (o servidor pode estar acordando). NAO reexecuta em respostas HTTP (4xx/5xx).
+async function rfetch(url: string, init?: RequestInit, retries = 2): Promise<Response> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fetch(url, init);
+    } catch (e) {
+      if (i >= retries) {
+        throw new Error(
+          "Não consegui falar com o servidor do modelo. Ele pode estar acordando " +
+            "(o backend gratuito hiberna após inatividade) — aguarde ~30s e tente novamente."
+        );
+      }
+      await sleep(2500 * (i + 1)); // 2.5s, 5s, ...
+    }
+  }
+}
+
 function toFeatures(d: CustomerData): Record<string, number> {
   return {
     gender: d.gender === "Male" ? 1 : 0,
@@ -73,7 +100,7 @@ interface BackendPredict {
 }
 
 export async function predictChurn(data: CustomerData): Promise<PredictionResult> {
-  const resp = await fetch(`${API}/predict`, {
+  const resp = await rfetch(`${API}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(toFeatures(data)),
@@ -109,20 +136,20 @@ export async function predictChurn(data: CustomerData): Promise<PredictionResult
 export async function predictBatch(file: File): Promise<any> {
   const fd = new FormData();
   fd.append("file", file);
-  const resp = await fetch(`${API}/predict_batch`, { method: "POST", body: fd });
+  const resp = await rfetch(`${API}/predict_batch`, { method: "POST", body: fd });
   if (!resp.ok) throw new Error(await errMsg(resp));
   return resp.json();
 }
 
 export async function getModelCard(): Promise<any> {
-  const resp = await fetch(`${API}/model_card`);
+  const resp = await rfetch(`${API}/model_card`);
   if (!resp.ok) throw new Error(`Backend ${resp.status}`);
   return resp.json();
 }
 
 // Observabilidade: agregados in-memory (saude da API, distribuicao de score/risco, drift, LLM).
 export async function getObservability(): Promise<any> {
-  const resp = await fetch(`${API}/observability`);
+  const resp = await rfetch(`${API}/observability`, undefined, 0);
   if (!resp.ok) throw new Error(`Backend ${resp.status}`);
   return resp.json();
 }
